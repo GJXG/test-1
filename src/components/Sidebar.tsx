@@ -20,6 +20,7 @@ interface SidebarProps {
   isSignedIn?: boolean;
   userInfo?: UserInfo | null;
   onLogin?: (userInfo: UserInfo) => void;
+  isUserInfoFolded?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -27,10 +28,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   characters = [],
   isSignedIn = false,
   userInfo = null,
-  onLogin
+  onLogin,
+  isUserInfoFolded
 }) => {
   const location = useLocation();
   const isScenePage = location.pathname === '/scene';
+  const [isFolded, setIsFolded] = React.useState(false);
+
+  const handleFoldChange = (folded: boolean) => {
+    setIsFolded(folded);
+  };
 
   return (
     <aside className={cn(
@@ -45,6 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <CharacterHistorySidebar 
           characters={characters}
           className={isScenePage ? "flex-1 overflow-y-auto" : "flex-1"}
+          isUserInfoFolded={isFolded}
         />
 
         {/* User Info Panel */}
@@ -56,6 +64,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             isSignedIn={isSignedIn}
             userInfo={userInfo}
             onLogin={onLogin}
+            isFolded={isFolded}
+            onFoldChange={handleFoldChange}
           />
           <SocialMediaIcons />
         </div>

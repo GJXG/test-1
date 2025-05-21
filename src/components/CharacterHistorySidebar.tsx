@@ -7,11 +7,13 @@ import { useCocos } from './CocosEmbed';
 interface CharacterHistorySidebarProps {
   characters: CharacterHistory[];
   className?: string;
+  isUserInfoFolded?: boolean;
 }
 
 const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
   characters,
-  className
+  className,
+  isUserInfoFolded = false
 }) => {
   const navigate = useNavigate();
   const { navigateToScene } = useCocos();
@@ -61,7 +63,10 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
       </div>
 
       {/* Character History */}
-      <div className="space-y-1.5 overflow-y-auto flex-1 bg-[#F6F6F6] p-2 rounded-2xl -mt-2">
+      <div className={cn(
+        "space-y-1.5 overflow-y-auto flex-1 bg-[#F6F6F6] p-2 rounded-2xl -mt-2 transition-all duration-300",
+        isUserInfoFolded ? "mt-4" : "-mt-2"
+      )}>
         {characters.map((character) => (
           <div
             key={character.npcId}

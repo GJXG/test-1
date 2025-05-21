@@ -25,7 +25,7 @@ const Mobile: React.FC = () => {
       </header>
 
       {/* Logo and Beta at bottom of header */}
-      <div className="absolute top-[250px] left-[55%] -translate-x-1/2 -translate-y-1/2 flex items-center z-20">
+      <div className="absolute top-[210px] left-[55%] -translate-x-1/2 -translate-y-1/2 flex items-center z-20">
         <img 
           src="/logo.png" 
           alt="DraMai Logo" 
@@ -37,12 +37,15 @@ const Mobile: React.FC = () => {
 
       {/* App Icon and Social Media Icons */}
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
-        <img
-          src="/icons/app.png"
-          alt="App Icon"
-          className="w-24 h-24 object-contain mb-6 rounded-2xl shadow-lg"
-        />
-        <div className="w-24 h-[1px] bg-gray-300 mb-4"></div>
+        <div className="flex flex-col items-center">
+          <img
+            src="/icons/app.png"
+            alt="App Icon"
+            className="w-24 h-24 object-contain rounded-2xl shadow-lg"
+          />
+          <span className="text-gray-400 text-sm mt-2">coming soon...</span>
+        </div>
+        <div className="w-24 h-[1px] bg-gray-300 my-4"></div>
         <div className="flex gap-4">
           <img src="/icons/discord.svg" alt="Discord" className="w-6 h-6" />
           <img src="/icons/instagram.svg" alt="Instagram" className="w-6 h-6" />

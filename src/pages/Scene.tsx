@@ -81,6 +81,7 @@ const Scene: React.FC = () => {
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const { sendMessageToGame, navigateToScene } = useCocos();
+  const [isUserInfoFolded, setIsUserInfoFolded] = useState(false);
 
   // Check login status on component mount
   useEffect(() => {
@@ -272,6 +273,7 @@ const Scene: React.FC = () => {
         isSignedIn={isSignedIn}
         userInfo={userInfo}
         onLogin={handleLogin}
+        isUserInfoFolded={isUserInfoFolded}
       />
       
       {/* Main Content */}
