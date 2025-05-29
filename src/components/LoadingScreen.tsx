@@ -8,19 +8,19 @@ const LoadingScreen: React.FC = () => {
   const navigate = useNavigate();
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // 确保iframe加载
+  // Ensure iframe is loaded
   useEffect(() => {
-    // 如果iframe还没有设置src，设置它
+    // If iframe source is not set, set it
     if (iframeRef.current && !iframeRef.current.src) {
       iframeRef.current.src = "https://dramai.world/webframe/";
     }
   }, []);
 
-  // 模拟进度条增长
+  // Simulate progress bar growth
   useEffect(() => {
     progressInterval.current = setInterval(() => {
       setProgress(prev => {
-        // 模拟进度增长，但最多到90%，等待游戏实际加载完成
+        // Simulate progress growth, but max to 90%, waiting for actual game loading to complete
         if (prev < 90) {
           return prev + Math.random() * 3;
         }
@@ -35,12 +35,12 @@ const LoadingScreen: React.FC = () => {
     };
   }, []);
 
-  // 监听iframe加载完成事件
+  // Listen for iframe load complete event
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       try {
         if (event.data && event.data.type === 'GAME_LOADED') {
-          // 游戏加载完成
+          // Game loading complete
           console.log('Game loaded successfully');
           setProgress(100);
           setLoaded(true);
@@ -49,7 +49,7 @@ const LoadingScreen: React.FC = () => {
             clearInterval(progressInterval.current);
           }
           
-          // 延迟一会再跳转，让用户看到100%
+          // Wait a moment before redirecting, to let user see 100%
           setTimeout(() => {
             navigate('/home');
           }, 800);
@@ -61,7 +61,7 @@ const LoadingScreen: React.FC = () => {
 
     window.addEventListener('message', handleMessage);
     
-    // 如果5秒内没有收到加载完成消息，也继续前进
+    // If no load complete message is received within 5 seconds, continue anyway
     const timeoutId = setTimeout(() => {
       if (!loaded) {
         console.log('Loading timeout, continuing anyway');

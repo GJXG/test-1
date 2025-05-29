@@ -20,7 +20,10 @@ interface SidebarProps {
   isSignedIn?: boolean;
   userInfo?: UserInfo | null;
   onLogin?: (userInfo: UserInfo) => void;
+  onLogout?: () => void;
   isUserInfoFolded?: boolean;
+  onSelectNpc?: (npcId: number) => void;
+  npcSwitchLoading?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -29,11 +32,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   isSignedIn = false,
   userInfo = null,
   onLogin,
-  isUserInfoFolded
+  onLogout,
+  isUserInfoFolded,
+  onSelectNpc,
+  npcSwitchLoading = false
 }) => {
   const location = useLocation();
   const isScenePage = location.pathname === '/scene';
-  const [isFolded, setIsFolded] = React.useState(false);
+  const [isFolded, setIsFolded] = React.useState(true);
 
   const handleFoldChange = (folded: boolean) => {
     setIsFolded(folded);
@@ -41,34 +47,34 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className={cn(
-      "w-[280px] flex flex-col h-screen bg-sidebar border-r border-sidebar-border p-4",
+      "w-[280px] h-screen bg-sidebar border-r border-sidebar-border flex flex-col",
       className
     )}>
-      <div className={cn(
-        "flex flex-col",
-        isScenePage ? "h-full" : "flex-1"
-      )}>
-        {/* Character History Sidebar */}
-        <CharacterHistorySidebar 
-          characters={characters}
-          className={isScenePage ? "flex-1 overflow-y-auto" : "flex-1"}
-          isUserInfoFolded={isFolded}
-        />
-
-        {/* User Info Panel */}
-        <div className={cn(
-          "mt-auto",
-          isScenePage ? "pt-4" : ""
-        )}>
-          <UserInfoPanel
-            isSignedIn={isSignedIn}
-            userInfo={userInfo}
-            onLogin={onLogin}
-            isFolded={isFolded}
-            onFoldChange={handleFoldChange}
+      {/* 主要内容区域 - 占据剩余空间 */}
+      <div className="flex-1 flex flex-col min-h-0 p-4">
+        {/* 显示角色列表 - 占据所有可用空间 */}
+        <div className="flex-1 min-h-0">
+          <CharacterHistorySidebar 
+            characters={characters}
+            className="h-full"
+            isUserInfoFolded={isFolded}
+            onSelectNpc={onSelectNpc}
+            npcSwitchLoading={npcSwitchLoading}
           />
-          <SocialMediaIcons />
         </div>
+      </div>
+
+      {/* 底部固定区域 - 用户信息和社交媒体图标 */}
+      <div className="flex-shrink-0 p-4 pt-0">
+        <UserInfoPanel
+          isSignedIn={isSignedIn}
+          userInfo={userInfo}
+          onLogin={onLogin}
+          onLogout={onLogout}
+          isFolded={isFolded}
+          onFoldChange={handleFoldChange}
+        />
+        <SocialMediaIcons />
       </div>
     </aside>
   );

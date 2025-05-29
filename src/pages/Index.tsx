@@ -74,6 +74,17 @@ const Index = () => {
     });
   };
 
+  const handleLogout = () => {
+    // 更新状态
+    setIsSignedIn(false);
+    setUserInfo(null);
+    
+    toast({
+      title: "Signed out",
+      description: "You have been successfully signed out."
+    });
+  };
+
   useEffect(() => {
     fetchTabContent(selectedTag);
   }, [selectedTag]);
@@ -104,6 +115,7 @@ const Index = () => {
         isSignedIn={isSignedIn}
         userInfo={userInfo}
         onLogin={handleLogin}
+        onLogout={handleLogout}
       />
 
       {/* Main Content */}

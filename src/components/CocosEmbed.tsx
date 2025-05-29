@@ -12,6 +12,7 @@ interface CocosContextType {
   navigateToScene: (target: string) => void;
   isMuted: boolean;
   toggleMute: () => void;
+  sendUserEmail: (email: string, loginType?: number) => void;
 }
 
 const CocosContext = createContext<CocosContextType | null>(null);
@@ -25,6 +26,9 @@ let globalSetShowIframe: ((show: boolean) => void) | null = null;
 const sendMessageToIframe = (message: any) => {
   if (iframeRef.current?.contentWindow) {
     iframeRef.current.contentWindow.postMessage(message, '*');
+    console.log('React: 发送数据到游戏iframe ->', message);
+  } else {
+    console.error('React: iframe contentWindow 未找到');
   }
 };
 
@@ -73,6 +77,10 @@ export const GlobalIframe: React.FC = () => {
           borderRadius: '8px 8px 8px 8px'
         }}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        referrerPolicy="no-referrer"
+        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+        loading="lazy"
+        title="Game Embed"
       />
       <button
         onClick={toggleMute}
@@ -121,6 +129,21 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
     setMessageLog(prev => [...prev, `Sent: ${JSON.stringify(message)}`]);
   };
 
+  const sendUserEmail = (email: string, loginType?: number) => {
+    const userEmailMessage = {
+      type: 'USER_LOGIN',
+      action: 'setUserEmail',
+      data: {
+        email: email,
+        timestamp: new Date().toISOString(),
+        source: 'react_parent',
+        loginType: loginType || 1 // 默认为1，谷歌为2，苹果为3
+      }
+    };
+    sendMessageToGame(userEmailMessage);
+    console.log('React: 发送用户邮箱到游戏 ->', email, '登录类型:', loginType || 1);
+  };
+
   const toggleMute = () => {
     setIsMuted(!isMuted);
     sendMessageToGame({
@@ -150,6 +173,24 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
       try {
         if (event.data.type === 'GAME_LOADED') {
           setIsConnected(true);
+          console.log('React: 游戏iframe已加载');
+          
+          // 检查是否有已登录的用户信息，如果有则发送邮箱
+          const storedUserInfo = localStorage.getItem('userInfo');
+          const storedLoginStatus = localStorage.getItem('isSignedIn');
+          
+          if (storedUserInfo && storedLoginStatus === 'true') {
+            try {
+              const userInfo = JSON.parse(storedUserInfo);
+              if (userInfo.userId && userInfo.userId.includes('@')) {
+                // 如果userId包含@符号，说明是邮箱格式
+                sendUserEmail(userInfo.userId, 1); // 默认登录类型为1
+              }
+            } catch (error) {
+              console.error('解析用户信息失败:', error);
+            }
+          }
+          
           // 发送初始场景数据
           sendMessageToGame({
             type: 'INIT_SCENE',
@@ -165,8 +206,30 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
       }
     };
 
+    // 监听localStorage变化（用户登录状态变化）
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'userInfo' && event.newValue) {
+        try {
+          const userInfo = JSON.parse(event.newValue);
+          const isSignedIn = localStorage.getItem('isSignedIn');
+          
+          if (isSignedIn === 'true' && userInfo.userId && userInfo.userId.includes('@')) {
+            // 用户刚刚登录，发送邮箱到游戏
+            sendUserEmail(userInfo.userId, 1); // 默认登录类型为1
+          }
+        } catch (error) {
+          console.error('处理用户登录状态变化失败:', error);
+        }
+      }
+    };
+
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // 组件挂载时显示 iframe
@@ -194,7 +257,8 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
       setShowIframe,
       navigateToScene,
       isMuted,
-      toggleMute
+      toggleMute,
+      sendUserEmail
     }}>
       {children}
     </CocosContext.Provider>

@@ -51,6 +51,27 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // 添加全局错误处理器来忽略COOP警告
+  React.useEffect(() => {
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      // 检查是否是COOP相关的错误
+      const message = args.join(' ');
+      if (message.includes('Cross-Origin-Opener-Policy') || 
+          message.includes('window.closed')) {
+        // 忽略COOP相关的警告，这些通常不影响实际功能
+        return;
+      }
+      // 其他错误正常显示
+      originalConsoleError.apply(console, args);
+    };
+
+    // 清理函数
+    return () => {
+      console.error = originalConsoleError;
+    };
+  }, []);
+
   return (
     <>
       <CocosEmbed>

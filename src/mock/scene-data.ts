@@ -110,7 +110,7 @@ export const MOCK_SCENE_THREAD: AIPost[] = [
     id: 3,
     roomId: '3',
     npcId: 10012,
-    content: 'The debut evaluation is coming up. Should I try a completely new concept or stick to what I know best?',
+    content: 'The debut evaluation is coming up. Should I try a completely new concept?',
     imgUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745',
     videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     tweetCommentVoList: [],
@@ -122,18 +122,17 @@ export const MOCK_SCENE_THREAD: AIPost[] = [
     npcName: 'Trump',
     npcAvatar: '/images/scene/headDir_10012.png',
     chooseList: [
-      'A: Try a new concept',
-      'B: Stick to your signature style',
-      'C: Mix both approaches'
+      'YES',
+      'NO'
     ],
     choose: false,
-    rateList: [40, 30, 30]
+    rateList: [60, 40]
   },
   {
     id: 4,
     roomId: '3',
     npcId: 10009,
-    content: 'The producer offered me a solo project. Should I take it or focus on the group debut?',
+    content: 'The producer offered me a solo project. Should I take it?',
     imgUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745',
     videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
     tweetCommentVoList: [],
@@ -145,12 +144,11 @@ export const MOCK_SCENE_THREAD: AIPost[] = [
     npcName: 'Elon Musk',
     npcAvatar: '/images/scene/headDir_10009.png',
     chooseList: [
-      'A: Take the solo project',
-      'B: Focus on group debut',
-      'C: Try to do both'
+      'YES',
+      'NO'
     ],
     choose: false,
-    rateList: [35, 45, 20]
+    rateList: [55, 45]
   }
 ];
 
@@ -185,13 +183,13 @@ export const MOCK_VOTE_HISTORY: VoteHistory[] = [
   {
     roomId: '3',
     requestId: 3,
-    content: 'What concept should Trump choose for the evaluation?',
+    content: 'Should Trump choose a new concept for the evaluation?',
     hasVoted: false,
-    correctOption: 'A',
-    options: ['A', 'B', 'C'],
+    correctOption: 'YES',
+    options: ['YES', 'NO'],
     timestamp: new Date(Date.now() - 7200000).toISOString(),
-    yesCount: '0',
-    noCount: '0',
+    yesCount: '85',
+    noCount: '65',
     myYesCount: '0',
     myNoCount: '0'
   },
@@ -200,13 +198,13 @@ export const MOCK_VOTE_HISTORY: VoteHistory[] = [
     requestId: 4,
     content: 'Should Elon Musk accept the solo project?',
     hasVoted: true,
-    userChoice: 'B',
-    correctOption: 'B',
-    options: ['A', 'B', 'C'],
+    userChoice: 'YES',
+    correctOption: 'YES',
+    options: ['YES', 'NO'],
     timestamp: new Date(Date.now() - 3600000).toISOString(),
-    yesCount: '0',
-    noCount: '0',
-    myYesCount: '0',
+    yesCount: '120',
+    noCount: '80',
+    myYesCount: '1',
     myNoCount: '0'
   }
 ];

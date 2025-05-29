@@ -36,6 +36,7 @@ export interface CharacterHistory {
   name: string;
   description: string;
   imageUrl: string;
+  lastChatTime?: number; // 添加最后聊天时间属性，用于排序
 }
 
 export interface VoteOption {
@@ -111,7 +112,40 @@ export interface Message {
   timestamp: string;
 }
 
+export interface ChatMessage {
+  id?: number;
+  content: string;
+  npcId: number;
+  createTime: number;
+  isUser?: boolean;
+  imgUrl?: string;
+}
+
 export interface ScenePageProps {
   sceneId: string;
   userId?: string;
+}
+
+export interface OperateTweetRequest {
+  tweetId: number;
+  type: number; // 1=点赞, 2=评论, 3=选择
+  content: string;
+  replyId: number;
+  chooseIndex: number;
+  nickName?: string;
+  userNo?: string;
+  commentId: number; // 新增：评论ID
+  rateList: number[]; // 新增：投票比例列表
+}
+
+export interface OperateTweetResponse {
+  tweetId: number;
+  type: number; // 1=点赞, 2=评论, 3=选择
+  content: string;
+  replyId: number;
+  nickName: string;
+  commentId: number;
+  userNo: string;
+  chooseIndex: number;
+  rateList: number[];
 }
