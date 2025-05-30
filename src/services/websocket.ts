@@ -163,6 +163,11 @@ class WebSocketService {
         if (storedUserInfo && storedLoginStatus) {
           // 如果用户已经登录过，使用存储的信息进行自动登录
           const userInfo = JSON.parse(storedUserInfo);
+          console.log('🔄 WebSocket重连后自动重新登录:', userInfo.userId);
+          
+          // 在重新登录之前，先尝试重发不需要登录的请求
+          this.retryFailedRequestsAfterReconnect();
+          
           if (userInfo.userId.includes('@')) {
             // 如果是邮箱格式，说明是Google登录
             const googleUser = {
@@ -193,6 +198,8 @@ class WebSocketService {
           }
         } else {
           console.log('No stored login information, waiting for user to login manually');
+          // 即使没有登录信息，也要尝试重发一些不需要登录的请求
+          this.retryFailedRequestsAfterReconnect();
         }
       };
 
@@ -538,22 +545,35 @@ class WebSocketService {
     });
   }
 
-  async send(command: number, data: any) {
+  async send(command: number, data: any, bypassLoginCheck: boolean = false) {
     try {
+      console.log('📤 尝试发送消息:', {
+        command,
+        data,
+        bypassLoginCheck,
+        isConnectionOpen: this.isConnectionOpen(),
+        isLoggedIn: this.isLoggedIn
+      });
+      
       // 等待连接建立
       if (!this.isConnectionOpen()) {
-        console.log('WebSocket not connected, waiting for connection...');
+        console.log('⏳ WebSocket未连接，等待连接建立...');
         const connected = await this.waitForConnection();
         if (!connected) {
-          console.error('Failed to establish WebSocket connection');
+          console.error('❌ WebSocket连接建立失败');
           // 将请求添加到待处理队列
           this.pendingRequests.push({ command, data });
           return;
         }
       }
 
-      if (command !== Commands.LOGIN && !this.isLoggedIn) {
-        console.log('Not logged in, adding request to pending queue:', command);
+      // 检查登录状态（可以被绕过）
+      if (command !== Commands.LOGIN && !this.isLoggedIn && !bypassLoginCheck) {
+        console.log('🔒 未登录，将请求添加到待处理队列:', {
+          command,
+          data,
+          queueLength: this.pendingRequests.length
+        });
         this.pendingRequests.push({ command, data });
         return;
       }
@@ -566,22 +586,23 @@ class WebSocketService {
       };
       
       const jsonMessage = JSON.stringify(message);
-      console.log('Sending message to server:', {
+      console.log('📡 发送消息到服务器:', {
         timestamp: new Date().toISOString(),
         message: jsonMessage,
         command: command,
-        data: data
+        data: data,
+        bypassedLogin: bypassLoginCheck
       });
       
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(jsonMessage);
       } else {
-        console.error('WebSocket连接未就绪，无法发送消息');
+        console.error('❌ WebSocket连接未就绪，无法发送消息');
         // 将请求添加到待处理队列
         this.pendingRequests.push({ command, data });
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ 发送消息时出错:', error);
       // 发生错误时，将请求添加到待处理队列
       this.pendingRequests.push({ command, data });
     }
@@ -793,7 +814,7 @@ class WebSocketService {
 
   private processLoginResponse(response: InetwarkResponseData) {
     if (response.code === 0) {
-      console.log('Login successful');
+      console.log('✅ Login successful, processing pending requests...');
       this.isLoggedIn = true;
       const loginData = response.data as any; // 使用any类型以访问可能存在的address字段
       localStorage.setItem('token', loginData.token);
@@ -808,28 +829,70 @@ class WebSocketService {
             const userInfo = JSON.parse(storedUserInfo);
             userInfo.location = loginData.address;
             localStorage.setItem('userInfo', JSON.stringify(userInfo));
-            console.log('已更新用户登录地址:', loginData.address);
+            console.log('📍 已更新用户登录地址:', loginData.address);
           } catch (error) {
-            console.error('更新用户地址信息失败:', error);
+            console.error('❌ 更新用户地址信息失败:', error);
           }
         }
       }
       
+      // 处理待发送的请求
+      const pendingCount = this.pendingRequests.length;
+      if (pendingCount > 0) {
+        console.log(`🔄 Login successful, retrying ${pendingCount} pending requests...`);
+      }
       this.processPendingRequests();
     } else {
-      console.error('Login failed:', response.message);
+      console.error('❌ Login failed:', response.message);
     }
   }
 
   private processPendingRequests() {
     if (!this.isLoggedIn) return;
+    
+    console.log('🔄 Processing pending requests, queue length:', this.pendingRequests.length);
 
     while (this.pendingRequests.length > 0) {
       const request = this.pendingRequests.shift();
       if (request) {
+        console.log('📤 Retrying failed request:', request.command);
         this.send(request.command, request.data);
       }
     }
+  }
+
+  // 在重连后重试失败的请求，即使没有登录
+  private retryFailedRequestsAfterReconnect() {
+    if (this.pendingRequests.length === 0) {
+      console.log('🔄 No failed requests to retry after reconnect');
+      return;
+    }
+
+    console.log('🔄 Retrying failed requests after reconnect, queue length:', this.pendingRequests.length);
+
+    // 创建一个副本来避免在迭代时修改原数组
+    const requestsToRetry = [...this.pendingRequests];
+    this.pendingRequests = []; // 清空原队列
+
+    // 定义不需要登录就可以重试的请求类型
+    const nonLoginRequiredCommands = [
+      Commands.HEARTBEAT,
+      // 可以根据需要添加其他不需要登录的命令
+    ];
+
+    requestsToRetry.forEach((request, index) => {
+      // 对于不需要登录的请求，立即重试
+      if (nonLoginRequiredCommands.includes(request.command)) {
+        console.log(`📤 Retrying non-login request: ${request.command} (${index + 1}/${requestsToRetry.length})`);
+        this.send(request.command, request.data, true); // 绕过登录检查
+      } else {
+        // 对于需要登录的请求，重新加入队列等待登录成功后处理
+        console.log(`⏳ Re-queuing request that requires login: ${request.command}`);
+        this.pendingRequests.push(request);
+      }
+    });
+
+    console.log('🔄 Completed reconnect retry, remaining queue length:', this.pendingRequests.length);
   }
 }
 

@@ -8,6 +8,7 @@ import { TabContent } from '@/types/drama';
 import { MOCK_DRAMAS } from '@/mock/dramas';
 import { toast } from '@/components/ui/use-toast';
 import { MOCK_DRAMA_COVERS, MOCK_CHARACTERS } from '@/mock/scene-data';
+import { websocketService } from '@/services/websocket';
 
 interface UserInfo {
   userId: string;
@@ -28,14 +29,51 @@ const Index = () => {
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
-  // Check login status on component mount
+  // Check login status on component mount and re-send login request
   useEffect(() => {
     const storedUserInfo = localStorage.getItem('userInfo');
     const storedLoginStatus = localStorage.getItem('isSignedIn');
     
     if (storedUserInfo && storedLoginStatus) {
-      setUserInfo(JSON.parse(storedUserInfo));
+      const userInfo = JSON.parse(storedUserInfo);
+      setUserInfo(userInfo);
       setIsSignedIn(true);
+      
+      // 重新发送登录请求
+      console.log('进入home页面，重新发送登录请求');
+      
+      if (userInfo.userId.includes('@')) {
+        // 如果是邮箱格式，说明是Google登录
+        const googleUser = {
+          getBasicProfile: () => ({
+            getEmail: () => userInfo.userId,
+            getName: () => userInfo.userId.split('@')[0],
+            getId: () => userInfo.id
+          })
+        };
+        websocketService.googleLogin(googleUser);
+        console.log('重新发送Google登录请求:', userInfo.userId);
+      } else {
+        // 否则使用普通登录
+        const loginData = {
+          loginType: 1,
+          name: userInfo.userId,
+          password: 'stored_session',
+          nickName: userInfo.userId,
+          avatar: 0,
+          sex: 1,
+          timeZone: 2,
+          clientOs: 'web',
+          userId: userInfo.id,
+          inviteCode: '',
+          invite: '',
+          address: ''
+        };
+        websocketService.login(loginData);
+        console.log('重新发送普通登录请求:', userInfo.userId);
+      }
+    } else {
+      console.log('home页面：未找到存储的登录信息');
     }
   }, []);
 

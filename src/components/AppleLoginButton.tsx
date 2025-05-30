@@ -9,6 +9,7 @@ const APPLE_CONFIG = {
   teamId: 'UG277K6KVJ',            // 您的Team ID
   clientId: 'world.dramai', // 您的Bundle ID
   keyId: 'M4Q94M576A',             // 您的Key ID
+
   
   // 登录设置
   scope: 'name email',              // 请求的权限范围

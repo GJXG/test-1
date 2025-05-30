@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCocos } from './CocosEmbed';
@@ -57,7 +57,7 @@ const CharacterCard: React.FC<{
     <>
     <div
       className={cn(
-        "w-[180px] h-[400px] flex flex-col justify-start rounded-xl overflow-hidden shadow-md bg-white dark:bg-gray-800",
+        "w-[180px] h-[350px] flex flex-col justify-start rounded-xl overflow-hidden shadow-md bg-white dark:bg-gray-800",
         "hover:scale-[1.02] hover:shadow-lg cursor-pointer transition-all duration-300",
         className
       )}
@@ -74,12 +74,11 @@ const CharacterCard: React.FC<{
 
       {/* Info Section */}
       <div className="flex-1 flex flex-col p-2 pt-0">
-        <div className="space-y-0">
-          <div className="font-bold text-xl leading-none">{name}</div>
-          <div className="text-muted-foreground font-normal text-xl leading-none -mt-2">/ {job}</div>
-        </div>
+        <h3 className="font-bold text-xl leading-none">
+          {name} <span className="text-muted-foreground font-normal text-xl leading-[-12px]">/ {job}</span>
+        </h3>
 
-        <p className="text-sm text-gray-400 mt-0 mb-3 line-clamp-3 leading-[0.8]">
+        <p className="text-sm text-gray-400 mt-0 mb-3 line-clamp-2 leading-[0.8]">
           {description}
         </p>
 
@@ -110,6 +109,8 @@ const CharacterList: React.FC<CharacterListProps> = ({
   className,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isAtLeftEdge, setIsAtLeftEdge] = useState(true);
+  const [isAtRightEdge, setIsAtRightEdge] = useState(false);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -122,32 +123,63 @@ const CharacterList: React.FC<CharacterListProps> = ({
     }
   };
 
+  // 检查滚动位置
+  const checkScrollPosition = () => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      setIsAtLeftEdge(container.scrollLeft <= 0);
+      
+      // 检查是否在最右侧 (scrollLeft + clientWidth 接近 scrollWidth)
+      const isRight = Math.abs(container.scrollWidth - container.clientWidth - container.scrollLeft) < 1;
+      setIsAtRightEdge(isRight);
+    }
+  };
+
+  // 设置初始滚动位置状态和滚动事件监听器
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      checkScrollPosition(); // 初始检查
+      container.addEventListener('scroll', checkScrollPosition);
+      // 窗口大小改变时也需要检查
+      window.addEventListener('resize', checkScrollPosition);
+      return () => {
+        container.removeEventListener('scroll', checkScrollPosition);
+        window.removeEventListener('resize', checkScrollPosition);
+      };
+    }
+  }, []);
+
   return (
     <div className={cn("w-full relative group", className)}>
       {/* Scroll Buttons */}
-      <button
-        onClick={() => scroll('left')}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 flex items-center justify-center rounded-full bg-white/80 shadow-lg transform transition-transform hover:scale-110 opacity-0 group-hover:opacity-100 disabled:opacity-0"
-        style={{ transform: 'translate(-50%, -50%)' }}
-      >
-        <ChevronLeft className="h-6 w-6" />
-      </button>
+      {!isAtLeftEdge && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 flex items-center justify-center rounded-full bg-white/80 shadow-lg transform transition-transform hover:scale-110 opacity-0 group-hover:opacity-100"
+          style={{ transform: 'translate(-50%, -50%)' }}
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      )}
       
-      <button
-        onClick={() => scroll('right')}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 flex items-center justify-center rounded-full bg-white/80 shadow-lg transform transition-transform hover:scale-110 opacity-0 group-hover:opacity-100 disabled:opacity-0"
-        style={{ transform: 'translate(50%, -50%)' }}
-      >
-        <ChevronRight className="h-6 w-6" />
-      </button>
+      {!isAtRightEdge && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 flex items-center justify-center rounded-full bg-white/80 shadow-lg transform transition-transform hover:scale-110 opacity-0 group-hover:opacity-100"
+          style={{ transform: 'translate(50%, -50%)' }}
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      )}
 
       {/* Character Cards Container */}
       <div 
         ref={scrollContainerRef}
         className="flex overflow-x-auto gap-4 pb-6 scrollbar-hide scroll-smooth"
         style={{
-          maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)',
-          WebkitMaskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)'
+          maskImage: `linear-gradient(to right, ${isAtLeftEdge ? 'black' : 'transparent'}, black 5%, black 95%, ${isAtRightEdge ? 'black' : 'transparent'})`,
+          WebkitMaskImage: `linear-gradient(to right, ${isAtLeftEdge ? 'black' : 'transparent'}, black 5%, black 95%, ${isAtRightEdge ? 'black' : 'transparent'})`
         }}
       >
         {characters.map((character) => (

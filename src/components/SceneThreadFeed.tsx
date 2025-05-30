@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AIPost, TweetComment } from '@/types/drama';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
-import { MessageSquare, Heart, ChevronDown, ChevronUp, Share2, Send, Maximize, Volume2, Play, AlertTriangle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { MessageSquare, Heart, ChevronDown, ChevronUp, Share2, Send, Maximize, Volume2, Play, AlertTriangle, Loader2 } from 'lucide-react';
+import { formatDistanceToNow, format } from 'date-fns';
 import { getNpcName, NpcName } from "@/config/npc";
 import { websocketService } from '@/services/websocket';
 import { Commands } from '@/services/websocket';
@@ -52,50 +52,132 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
   const [videoErrors, setVideoErrors] = useState<Record<number, string>>({});
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   
-  // 分页相关状态
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [pageLoading, setPageLoading] = useState<boolean>(false);
-  const pageSize = 10; // 每页显示10条推文
-
-  // 使用useMemo缓存分页器UI，减少重新渲染
-  const paginationControls = React.useMemo(() => (
-    <div className="flex justify-between items-center mt-4 px-2">
-      <div></div> {/* 左侧空白占位 */}
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={() => currentPage > 0 && onPageChange?.(currentPage - 1)}
-          disabled={currentPage === 0 || pageLoading || loading}
-          className={`flex items-center justify-center p-2 rounded-full ${
-            currentPage === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-500 hover:bg-blue-50'
-          }`}
-          aria-label="Previous page"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        
-        <button
-          onClick={() => currentPage < totalPages - 1 && onPageChange?.(currentPage + 1)}
-          disabled={currentPage >= totalPages - 1 || pageLoading || loading}
-          className={`flex items-center justify-center p-2 rounded-full ${
-            currentPage >= totalPages - 1 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-500 hover:bg-blue-50'
-          }`}
-          aria-label="Next page"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-      <div></div> {/* 右侧空白占位 */}
-    </div>
-  ), [currentPage, totalPages, pageLoading, loading, onPageChange]);
-
-  // 计算总页数（根据推文总数和每页显示数量）
+  // 懒加载相关状态
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const feedRef = useRef<HTMLDivElement>(null);
+  const loadingRef = useRef<HTMLDivElement>(null);
+  const pageSize = 10; // 每页显示10条推文，与后端请求保持一致
+  // 添加锁机制，防止重复触发加载
+  const isLoadingRef = useRef<boolean>(false);
+  
+  // 监听交叉观察器，用于检测底部加载元素是否进入视口
   useEffect(() => {
-    // 这里的逻辑应该在实际应用中根据后端返回的总记录数来计算
-    // 如果后端不返回总记录数，可以根据当前页是否有满额数据来判断是否有下一页
-    const hasFullPage = posts.length >= pageSize;
-    const estimatedTotalPages = Math.max(1, currentPage + (hasFullPage ? 2 : 1));
-    setTotalPages(estimatedTotalPages);
-  }, [posts, currentPage, pageSize]);
+    if (!loadingRef.current || loading || !hasMore) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        // 添加锁检查，确保不会重复触发
+        if (target.isIntersecting && !loading && !loadingMore && hasMore && !isLoadingRef.current) {
+          // 当加载元素进入视口，且当前没有正在加载，且还有更多数据时，加载更多
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1 } // 当10%的元素可见时触发
+    );
+    
+    observer.observe(loadingRef.current);
+    
+    return () => {
+      if (loadingRef.current) {
+        observer.unobserve(loadingRef.current);
+      }
+    };
+  }, [loading, loadingMore, hasMore, posts.length]);
+  
+  // 当posts发生变化时，重新评估是否还有更多数据
+  useEffect(() => {
+    // 检查posts是否有新数据
+    console.log(`组件posts更新: 当前数据量: ${posts.length}, 当前页码: ${currentPage}`);
+    
+    // 新的判断逻辑：
+    // 1. 如果当前是第一页(currentPage=0)，且有数据，则认为可能有更多数据
+    // 2. 如果是翻页加载(currentPage>0)，则主要根据数据量是否等于pageSize来判断
+    
+    if (currentPage === 0) {
+      // 初始页面加载
+      if (posts.length > 0) {
+        // 如果有数据，认为可能有更多
+        console.log(`初始页有${posts.length}条数据，可能有更多数据`);
+        setHasMore(true);
+      } else {
+        // 没有数据
+        console.log('初始页无数据');
+        setHasMore(false);
+      }
+    } else {
+      // 翻页加载，判断是否还有更多数据
+      // 这里的判断基于每页应该返回pageSize条数据的假设
+      // 如果返回的数据量小于pageSize，则认为没有更多数据了
+      if (posts.length >= pageSize) {
+        console.log(`当前共有${posts.length}条数据，页码${currentPage}，可能还有更多数据`);
+        setHasMore(true);
+      } else {
+        console.log(`当前共有${posts.length}条数据，页码${currentPage}，没有更多数据了`);
+        setHasMore(false);
+      }
+    }
+    
+    // 如果正在加载更多，但是已经有了数据，则结束加载状态
+    if (loadingMore && posts.length > 0) {
+      console.log('检测到新数据已加载，结束loadingMore状态');
+      setLoadingMore(false);
+    }
+  }, [posts, currentPage, pageSize, loadingMore]);
+
+  // 加载更多数据
+  const handleLoadMore = useCallback(() => {
+    // 如果已经在加载中，直接返回
+    if (loadingMore || !hasMore || loading || isLoadingRef.current) {
+      console.log('无法加载更多:', {
+        loadingMore,
+        hasMore,
+        loading,
+        isLoadingLocked: isLoadingRef.current
+      });
+      return;
+    }
+    
+    // 设置加载锁
+    isLoadingRef.current = true;
+    console.log('加载更多数据，当前页：', currentPage, '已设置加载锁');
+    setLoadingMore(true);
+    
+    // 调用父组件的onPageChange函数加载下一页
+    onPageChange?.(currentPage + 1);
+    
+    // 短暂延迟后检查是否有新数据并释放锁
+    setTimeout(() => {
+      setLoadingMore(false);
+      
+      // 延迟释放锁，确保不会立即触发下一次加载
+      setTimeout(() => {
+        isLoadingRef.current = false;
+        console.log('释放加载锁，允许下一次加载');
+      }, 1000);
+    }, 3000); // 增加延迟时间确保数据有足够时间加载
+  }, [currentPage, loadingMore, hasMore, loading, posts.length, onPageChange, pageSize]);
+
+  // 处理滚动到底部事件（作为备用方案，增强用户体验）
+  const handleScroll = useCallback(() => {
+    if (!feedRef.current || loading || loadingMore || !hasMore || isLoadingRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+    
+    // 当滚动到距离底部100px时，提前加载更多
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      handleLoadMore();
+    }
+  }, [loading, loadingMore, hasMore, handleLoadMore]);
+  
+  // 添加滚动事件监听
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [handleScroll]);
 
   const handleVote = (post: AIPost, optionIndex: number) => {
     if (!isSignedIn) {
@@ -179,7 +261,39 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
   };
 
   const formatTime = (timestamp: number) => {
-    return formatDistanceToNow(timestamp, { addSuffix: true });
+    // 确保时间戳是合法的
+    if (!timestamp || isNaN(timestamp)) {
+      console.error('Invalid timestamp:', timestamp);
+      return 'Invalid date';
+    }
+    
+    try {
+      // API返回的时间戳格式不是标准的毫秒时间戳
+      // 检查时间戳的位数，如果小于13位，可能是秒级时间戳或其他格式
+      let date;
+      
+      if (timestamp < 10000000000) { // 小于10位数，可能是相对时间或特殊格式
+        // 假设这是相对于某个基准日期的秒数
+        // 这里我们使用当前日期作为基准，减去相应的秒数
+        const now = new Date();
+        date = new Date(now.getTime() - timestamp * 1000); // 将秒转换为毫秒
+      } else {
+        // 假设是标准的毫秒时间戳
+        date = new Date(timestamp);
+      }
+      
+      // 检查日期是否有效
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date from timestamp:', timestamp);
+        return 'Invalid date';
+      }
+      
+      // 将时间戳转换为YYYY-MM-DD格式
+      return format(date, 'yyyy-MM-dd');
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Error';
+    }
   };
 
   const isPostLiked = (post: AIPost) => {
@@ -240,8 +354,34 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
     if (!videoElement) return;
     
     if (videoElement.paused) {
+      // 在播放当前视频之前，先暂停其他所有正在播放的视频
+      Object.keys(videoRefs.current).forEach(key => {
+        const otherPostId = parseInt(key);
+        const otherVideo = videoRefs.current[otherPostId];
+        
+        // 暂停其他视频（除了当前要播放的视频）
+        if (otherVideo && otherPostId !== postId && !otherVideo.paused) {
+          otherVideo.pause();
+          console.log(`Pausing video ${otherPostId} to play video ${postId}`);
+        }
+      });
+      
+      // 更新所有其他视频的播放状态为false
+      setPlayingVideos(prev => {
+        const newState = { ...prev };
+        Object.keys(newState).forEach(key => {
+          const otherPostId = parseInt(key);
+          if (otherPostId !== postId) {
+            newState[otherPostId] = false;
+          }
+        });
+        return newState;
+      });
+      
+      // 播放当前视频
       videoElement.play().then(() => {
         setPlayingVideos(prev => ({ ...prev, [postId]: true }));
+        console.log(`Playing video ${postId}`);
       }).catch(error => {
         console.error("Error playing video:", error);
         toast({
@@ -250,8 +390,10 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
         });
       });
     } else {
+      // 暂停当前视频
       videoElement.pause();
       setPlayingVideos(prev => ({ ...prev, [postId]: false }));
+      console.log(`Pausing video ${postId}`);
     }
   };
 
@@ -294,6 +436,36 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
     setVideoLoading(prev => ({ ...prev, [postId]: false }));
   };
 
+  const handleVideoPlay = (postId: number) => {
+    // 当视频开始播放时，暂停其他所有正在播放的视频
+    Object.keys(videoRefs.current).forEach(key => {
+      const otherPostId = parseInt(key);
+      const otherVideo = videoRefs.current[otherPostId];
+      
+      // 暂停其他视频（除了当前要播放的视频）
+      if (otherVideo && otherPostId !== postId && !otherVideo.paused) {
+        otherVideo.pause();
+        console.log(`Auto-pausing video ${otherPostId} because video ${postId} started playing`);
+      }
+    });
+    
+    // 更新所有其他视频的播放状态为false
+    setPlayingVideos(prev => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach(key => {
+        const otherPostId = parseInt(key);
+        if (otherPostId !== postId) {
+          newState[otherPostId] = false;
+        }
+      });
+      // 设置当前视频为播放状态
+      newState[postId] = true;
+      return newState;
+    });
+    
+    console.log(`Video ${postId} started playing`);
+  };
+
   const retryVideoLoad = (postId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -307,9 +479,32 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
     videoElement.load();
   };
 
+  // 添加一个新的useEffect专门监控posts的变化
+  useEffect(() => {
+    console.log(`🖥️ [SceneThreadFeed] posts数组变化 - 长度: ${posts.length}, 页码: ${currentPage}`);
+    if (posts.length > 0) {
+      // 记录所有ID，便于对比
+      const allIds = posts.map(p => p.id).join(', ');
+      console.log(`🖥️ [SceneThreadFeed] 当前所有posts IDs: ${allIds}`);
+      
+      // 检查前5条和后5条，避免日志太长
+      const firstFew = posts.slice(0, Math.min(5, posts.length));
+      console.log(`🖥️ [SceneThreadFeed] 前${firstFew.length}条数据:`, 
+        firstFew.map(p => ({ id: p.id, content: p.content.substring(0, 20) })));
+      
+      if (posts.length > 5) {
+        const lastFew = posts.slice(-Math.min(5, posts.length - 5));
+        console.log(`🖥️ [SceneThreadFeed] 后${lastFew.length}条数据:`, 
+          lastFew.map(p => ({ id: p.id, content: p.content.substring(0, 20) })));
+      }
+    }
+  }, [posts, currentPage]);
+
   // 优化渲染，减少不必要的重新计算
-  const postsList = React.useMemo(() => (
-    posts.map(post => (
+  const postsList = React.useMemo(() => {
+    console.log(`🖥️ [SceneThreadFeed] 渲染postsList - 数据长度: ${posts.length}`);
+    
+    const result = posts.map(post => (
       <div
         key={post.id}
         className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 transition hover:shadow-md"
@@ -349,6 +544,7 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
               playsInline
               poster={post.imgUrl || undefined}
               onClick={(e) => e.stopPropagation()}
+              onPlay={() => handleVideoPlay(post.id)}
               onPause={() => setPlayingVideos(prev => ({ ...prev, [post.id]: false }))}
               onEnded={() => setPlayingVideos(prev => ({ ...prev, [post.id]: false }))}
               onError={e => handleVideoError(post.id, e)}
@@ -473,25 +669,74 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
         )}
       </div>
     ))
-  ), [posts, expandedPosts, newComment, localLikes]);
+    return result;
+  }, [posts, expandedPosts, newComment, localLikes, playingVideos, videoLoading, videoErrors]);
+
+  // 检查是否有数据但未显示
+  useEffect(() => {
+    if (posts.length > 0 && !loading && postsList.length === 0) {
+      console.warn('🚨 [SceneThreadFeed] 异常情况: 有posts数据但postsList为空!');
+      console.warn('🚨 [SceneThreadFeed] posts.length =', posts.length);
+      console.warn('🚨 [SceneThreadFeed] postsList.length =', postsList.length);
+      console.warn('🚨 [SceneThreadFeed] loading =', loading);
+      console.warn('🚨 [SceneThreadFeed] loadingMore =', loadingMore);
+    }
+    
+    if (postsList.length !== posts.length) {
+      console.warn(`🚨 [SceneThreadFeed] postsList长度(${postsList.length})与posts长度(${posts.length})不一致!`);
+    }
+  }, [posts.length, postsList.length, loading, loadingMore]);
+
+  // 在return之前添加日志
+  console.log(`🖥️ [SceneThreadFeed] 即将渲染 - posts长度: ${posts.length}, loading: ${loading}, hasMore: ${hasMore}, loadingMore: ${loadingMore}`);
+
+  // 添加对loading状态的额外处理
+  useEffect(() => {
+    console.log(`[SceneThreadFeed] loading状态变化: ${loading}`);
+    if (!loading && posts.length > 0) {
+      console.log('[SceneThreadFeed] 加载完成且有数据，强制更新DOM');
+      // 如果需要，可以在这里添加额外的DOM更新逻辑
+    }
+  }, [loading, posts.length]);
 
   return (
-    <div className={cn("flex flex-col space-y-4", className)}>
-      {loading || pageLoading ? (
+    <div ref={feedRef} className={cn("flex flex-col space-y-4", className)}>
+      {posts.length === 0 && loading ? (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading posts...</p>
+            <p className="text-muted-foreground">Loading...</p>
           </div>
         </div>
       ) : posts.length === 0 ? (
         <div className="flex justify-center items-center h-64 text-gray-500">
-          No posts yet
+          No content
         </div>
       ) : (
         <>
-          {postsList}
-          {paginationControls}
+          {/* 强制显示帖子内容，无论loading状态如何 */}
+          <div className="space-y-4">
+            {postsList}
+          </div>
+          
+          {/* 底部加载更多区域 */}
+          <div 
+            ref={loadingRef} 
+            className="py-4 flex justify-center items-center"
+          >
+            {loading || loadingMore ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
+                <span className="text-sm text-gray-500">Loading more...</span>
+              </div>
+            ) : hasMore ? (
+              <div className="h-10 flex items-center justify-center">
+                <span className="text-xs text-gray-400">Scroll to load more</span>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-400">No more content</span>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -499,15 +744,36 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
 };
 
 export default React.memo(SceneThreadFeed, (prevProps, nextProps) => {
-  // 自定义比较函数，只有在关键props变化时才重新渲染
-  // 比较posts数组长度和当前页面是否变化
-  const postsLengthEqual = prevProps.posts.length === nextProps.posts.length;
-  const postsIdEqual = prevProps.posts.every((post, index) => 
-    nextProps.posts[index]?.id === post.id
-  );
-  const pageEqual = prevProps.currentPage === nextProps.currentPage;
-  const loadingEqual = prevProps.loading === nextProps.loading;
+  // 自定义比较函数，重点检查posts引用变化
+  
+  // 添加日志来追踪比较过程
+  console.log('🔄 SceneThreadFeed比较props:', {
+    prevPostsLength: prevProps.posts.length,
+    nextPostsLength: nextProps.posts.length,
+    prevPage: prevProps.currentPage,
+    nextPage: nextProps.currentPage,
+    postsRefChanged: prevProps.posts !== nextProps.posts
+  });
 
-  // 如果主要的props没变，返回true表示不需要重新渲染
-  return postsLengthEqual && postsIdEqual && pageEqual && loadingEqual;
+  // ===== 关键检查 =====
+  // 1. 检查posts引用是否变化 - 最重要
+  const postsRefChanged = prevProps.posts !== nextProps.posts;
+  
+  // 2. 检查page和loading - 也很重要
+  const pageChanged = prevProps.currentPage !== nextProps.currentPage;
+  const loadingChanged = prevProps.loading !== nextProps.loading;
+  
+  // 直接返回是否需要重新渲染
+  // 只要有任何一个关键属性变化，就重新渲染
+  const shouldRerender = postsRefChanged || pageChanged || loadingChanged;
+  
+  if (shouldRerender) {
+    console.log('🔄 SceneThreadFeed将重新渲染:', 
+      postsRefChanged ? '因为posts数组变化' : 
+      pageChanged ? '因为页码变化' : 
+      '因为loading状态变化');
+  }
+  
+  // false表示需要重新渲染，true表示可以跳过渲染
+  return !shouldRerender;
 });

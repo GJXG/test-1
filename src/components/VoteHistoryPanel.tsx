@@ -68,26 +68,9 @@ const VoteHistoryPanel: React.FC<VoteHistoryPanelProps> = ({
     return ['YES', 'NO'];
   };
 
-  // 按时间戳倒序排序投票历史（最新的在最上面）
-  const sortedVoteHistory = React.useMemo(() => {
-    return [...voteHistory].sort((a, b) => {
-      // 将时间戳转换为Date对象进行比较
-      const dateA = new Date(a.timestamp).getTime();
-      const dateB = new Date(b.timestamp).getTime();
-      // 倒序排序：最新的时间在前面
-      return dateB - dateA;
-    });
-  }, [voteHistory]);
-
-  console.log('🗳️ Sorted vote history:', sortedVoteHistory.map(v => ({ 
-    content: v.content, 
-    timestamp: v.timestamp,
-    requestId: v.requestId 
-  })));
-
   return (
     <div className={cn("flex flex-col items-center space-y-2", className)}>
-      {sortedVoteHistory.map((vote, index) => {
+      {voteHistory.map((vote, index) => {
         const options = getOptionsForScene(currentSceneId);
         const selectedOption = vote.userChoice;
         
@@ -103,7 +86,7 @@ const VoteHistoryPanel: React.FC<VoteHistoryPanelProps> = ({
               )}
             >
               <p className={cn(
-                "text-center text-sm leading-[0.85]",
+                "text-center text-sm leading-tight",
                 selectedOption ? "text-[#8B5E34]" : "text-[#E3B341]"
               )}>
                 {vote.content}
@@ -138,7 +121,7 @@ const VoteHistoryPanel: React.FC<VoteHistoryPanelProps> = ({
             </div>
 
             {/* Arrow - show after options */}
-            {index < sortedVoteHistory.length - 1 && (
+            {index < voteHistory.length - 1 && (
               <div className="flex justify-center w-full py-1">
                 <ChevronDown className="w-6 h-6 text-[#E3B341]" />
               </div>

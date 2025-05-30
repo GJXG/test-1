@@ -194,25 +194,111 @@ const Scene: React.FC = () => {
   // 处理事件处理器和事件依赖项
   const handleSceneFeed = React.useCallback((data: any) => {
     if (data && data.tweetVoList) {
-      console.log('Received scene feed data:', {
+      // 忽略第一条推文信息
+      const filteredTweets = data.tweetVoList.slice(1);
+      
+      console.log('🔍 Received scene feed data:', {
         roomId: data.roomId,
         currentSceneId: searchParams.get('sceneId'),
         effectiveSceneId: getEffectiveSceneId(searchParams.get('sceneId') || 'MainMenu'),
-        tweetCount: data.tweetVoList.length,
+        totalTweetCount: data.tweetVoList.length,
+        filteredTweetCount: filteredTweets.length,
         currentPage: currentPageRef.current, // 使用ref中的值
-        tweets: data.tweetVoList.map((tweet: any) => ({
-          id: tweet.id,
-          content: tweet.content.substring(0, 50) + '...',
-          commentCount: tweet.commentCount,
-          likeCount: tweet.likeCount,
-          commentsLength: tweet.tweetCommentVoList?.length || 0
-        }))
+        ignoredFirstTweet: data.tweetVoList.length > 0 ? data.tweetVoList[0].id : 'none',
+        firstUsedTweet: filteredTweets.length > 0 ? filteredTweets[0].id : 'none',
+        lastTweetId: filteredTweets.length > 0 ? filteredTweets[filteredTweets.length - 1].id : 'none'
       });
-      setAiPosts(data.tweetVoList);
-      setPostsLoading(false); // 推文数据加载完成
-      console.log('Updated aiPosts with', data.tweetVoList.length, 'tweets for roomId:', data.roomId);
+      
+      // 重要：收到数据后立即重置loading状态，让UI可以更新
+      console.log('收到数据，立即设置 postsLoading = false');
+      setPostsLoading(false);
+      
+      // 详细日志：打印接收到的推文ID列表（已忽略第一条）
+      console.log('🔄 接收到的推文ID列表(已忽略第一条):', filteredTweets.map((t: any) => t.id).join(', '));
+      
+      // 对于初始加载或场景切换（页码为0）时，直接替换所有数据
+      if (currentPageRef.current === 0) {
+        console.log('🔄 初始页(0)加载，直接替换所有数据');
+        console.log('🔄 设置aiPosts =', JSON.stringify(filteredTweets.map(t => ({ id: t.id, content: t.content.substring(0, 20) }))));
+        setAiPosts(filteredTweets);
+        
+        // 确认数据设置成功
+        setTimeout(() => {
+          console.log('🔄 初始页设置后检查 aiPosts.length =', aiPosts.length);
+        }, 0);
+      } else {
+        // 对于懒加载（页码>0）时，将新数据追加到现有数据
+        console.log(`🔄 懒加载(页码${currentPageRef.current})，准备合并数据，当前aiPosts.length = ${aiPosts.length}`);
+        
+        // 在更新前保存一份当前数据，用于对比
+        const prevPostsIds = aiPosts.map(post => post.id);
+        console.log('🔄 更新前的aiPosts IDs:', prevPostsIds.join(', '));
+        
+        // 使用函数式更新避免依赖aiPosts
+        setAiPosts(prevPosts => {
+          // 记录当前已有的推文ID
+          const existingIds = new Set(prevPosts.map(post => post.id));
+          console.log('🔄 当前已有推文IDs集合大小:', existingIds.size);
+          
+          // 只保留还不存在的新推文
+          const uniqueNewPosts = filteredTweets.filter(
+            (post: any) => !existingIds.has(post.id)
+          );
+          
+          console.log(`🔄 过滤出 ${uniqueNewPosts.length} 条新推文，当前页码: ${currentPageRef.current}`);
+          if (uniqueNewPosts.length > 0) {
+            console.log('🔄 新推文IDs:', uniqueNewPosts.map((p: any) => p.id).join(', '));
+          } else {
+            console.log('🔄 没有新的推文ID');
+          }
+          
+          // 合并现有推文和新推文
+          if (uniqueNewPosts.length > 0) {
+            console.log(`🔄 追加 ${uniqueNewPosts.length} 条新推文到现有 ${prevPosts.length} 条`);
+            const mergedPosts = [...prevPosts, ...uniqueNewPosts];
+            console.log('🔄 合并后总推文数:', mergedPosts.length);
+            console.log('🔄 合并后所有推文IDs:', mergedPosts.map(p => p.id).join(', '));
+            return mergedPosts;
+          } else {
+            console.log('🔄 没有新数据可追加，保持原有数据不变');
+            return prevPosts;
+          }
+        });
+        
+        // 确认数据更新成功
+        setTimeout(() => {
+          console.log('🔄 懒加载更新后检查 aiPosts.length =', aiPosts.length);
+          console.log('🔄 更新后的aiPosts IDs:', aiPosts.map(post => post.id).join(', '));
+          
+          // 检查新数据是否成功追加
+          const currentIds = new Set(aiPosts.map(post => post.id));
+          const newDataIds = filteredTweets.map((t: any) => t.id);
+          const allIncluded = newDataIds.every(id => currentIds.has(id));
+          console.log('🔄 所有新数据都已包含在aiPosts中?', allIncluded ? '是' : '否');
+          
+          if (!allIncluded) {
+            console.warn('🔄 有新数据未被追加！这可能是问题所在');
+            const missingIds = newDataIds.filter(id => !currentIds.has(id));
+            console.warn('🔄 缺失的ID:', missingIds.join(', '));
+          }
+        }, 100);
+      }
+      
+      // 再次确认loading状态已经关闭
+      setTimeout(() => {
+        if (postsLoading) {
+          console.log('数据处理完成后检测到loading状态仍为true，强制设置为false');
+          setPostsLoading(false);
+        }
+      }, 0);
+      
+      console.log('🔄 Updated aiPosts with', filteredTweets.length, 'tweets for roomId:', data.roomId);
+    } else {
+      console.warn('接收到无效的场景数据:', data);
+      // 即使数据无效也要重置loading状态，避免UI卡在加载中
+      setPostsLoading(false);
     }
-  }, []); // 移除所有依赖项，使用ref保持最新状态
+  }, [postsLoading, aiPosts]); // 添加aiPosts作为依赖项，以便访问最新值
   
   const handleVoteHistory = React.useCallback((event: any) => {
     console.log('🗳️ handleVoteHistory called with event:', event);
@@ -415,22 +501,51 @@ const Scene: React.FC = () => {
 
   // 处理页面切换
   const handlePageChange = React.useCallback((newPage: number) => {
-    console.log(`Switching to page ${newPage + 1}`);
-    setCurrentPage(newPage);
+    console.log(`📄 切换到新页面，页码: ${newPage}, 当前aiPosts数据量: ${aiPosts.length}`);
+    
+    // 立即更新状态和引用，确保后续逻辑能获取到最新的页码
+    currentPageRef.current = newPage; // 先更新ref，确保在状态更新前就能获取到新值
+    setCurrentPage(newPage);  // 然后更新状态
+    
+    console.log(`📄 currentPageRef.current已更新为 ${currentPageRef.current}`);
+    
     // 只更新推文数据，不触发整个页面重新加载
     if (websocketService.isConnectionOpen()) {
-      setPostsLoading(true); // 只设置推文加载状态
-      websocketService.send(Commands.GET_SCENE_FEED, { 
-        roomId: Number(effectiveSceneId), 
-        page: newPage, 
-        size: 10
-      });
-      // 短暂延迟后重置加载状态，避免长时间显示加载中
+      console.log(`📤 设置加载状态 postsLoading=true`);
+      setPostsLoading(true); // 设置推文加载状态
+      
+      // 获取新页面的数据（翻页时通常只需要获取推文数据）
+      console.log(`📤 [翻页] 发送推文数据请求，页码: ${newPage}, 房间ID: ${effectiveSceneId}`);
+      
+      // 使用setTimeout确保currentPageRef.current已更新
       setTimeout(() => {
-        setPostsLoading(false);
-      }, 1000);
+        console.log(`📤 发送请求前再次检查 - 当前页码: ${currentPageRef.current}, 数据量: ${aiPosts.length}`);
+        
+        // 确保使用最新的页码值
+        const currentRequestPage = currentPageRef.current;
+        console.log(`📤 发送请求使用页码: ${currentRequestPage}`);
+        
+        websocketService.send(Commands.GET_SCENE_FEED, { 
+          roomId: Number(effectiveSceneId), 
+          page: currentRequestPage, // 使用ref中的最新值
+          size: 10
+        });
+        
+        // 设置超时检查，如果长时间没有收到数据，才会重置loading状态
+        // 避免短时间内重置loading状态，让handleSceneFeed回调有机会处理
+        setTimeout(() => {
+          if (postsLoading) {
+            console.log('📄 请求发出后10秒仍未收到数据，强制结束loading状态');
+            setPostsLoading(false);
+          }
+        }, 10000); // 增加超时时间到10秒
+      }, 0);
+    } else {
+      console.error('WebSocket连接未建立，无法加载更多数据');
+      // 连接未建立时，重置loading状态
+      setPostsLoading(false);
     }
-  }, [effectiveSceneId]);
+  }, [effectiveSceneId, postsLoading, aiPosts.length]);
   
   // 初始化加载和设置WebSocket事件处理器
   useEffect(() => {
@@ -455,80 +570,81 @@ const Scene: React.FC = () => {
   useEffect(() => {
     console.log('Loading scene data, sceneId:', sceneId, 'effectiveSceneId:', effectiveSceneId);
     
-    // 延迟加载数据，确保WebSocket连接有时间建立
-    const timer = setTimeout(() => {
+    // 定义数据加载函数 - 按顺序发送请求
+    const loadSceneData = () => {
+      console.log(`Starting to fetch scene data sequentially, Scene ID: ${effectiveSceneId}, currentPage: ${currentPageRef.current}`);
+      
       // 加载场景数据
       setLoading(true);
       setPostsLoading(true); // 重置推文加载状态
       setVotesLoading(true); // 重置投票加载状态
-      try {
-        console.log(`Starting to fetch scene data, Scene ID: ${effectiveSceneId}`);
+      
+      // 第一个请求：获取场景推文数据
+      console.log('📤 [1/3] 发送推文数据请求...');
+      websocketService.send(Commands.GET_SCENE_FEED, { 
+        roomId: Number(effectiveSceneId), 
+        page: currentPageRef.current, 
+        size: 10 // 每页10条
+      }, true); // 绕过登录检查
+      
+      // 延迟发送第二个请求：获取投票历史记录
+      setTimeout(() => {
+        console.log('📤 [2/3] 发送投票历史请求...');
+        websocketService.send(Commands.VOTE_THREAD, {
+          roomId: Number(effectiveSceneId)
+        }, true); // 绕过登录检查
         
-        // 确保WebSocket连接已建立
-        if (websocketService.isConnectionOpen()) {
-          // 获取场景推文数据，使用当前页码
-          websocketService.send(Commands.GET_SCENE_FEED, { 
-            roomId: Number(effectiveSceneId), 
-            page: currentPageRef.current, 
-            size: 10 // 每页10条
-          });
-          
-          // 获取投票历史记录
-          console.log('🗳️ Requesting vote history for roomId:', Number(effectiveSceneId));
-          websocketService.getVoteHistory(Number(effectiveSceneId));
-          
-          // 获取角色历史
+        // 延迟发送第三个请求：获取角色历史
+        setTimeout(() => {
+          console.log('📤 [3/3] 发送角色历史请求...');
           websocketService.send(Commands.GET_CHARACTER_HISTORY, {
             roomId: Number(effectiveSceneId)
-          });
+          }, true); // 绕过登录检查
           
-          // 给WebSocket响应一些时间
-          setTimeout(() => {
-            setLoading(false);
-            // 如果在超时后仍然没有数据，停止loading状态
-            setTimeout(() => {
-              setPostsLoading(false);
-              setVotesLoading(false);
-            }, 2000); // 额外2秒等待数据
-          }, 1500);
-        } else {
-          console.warn("WebSocket connection not established, waiting for connection...");
-          // WebSocket未连接，延迟重试
-          setTimeout(() => {
-            if (websocketService.isConnectionOpen()) {
-              websocketService.send(Commands.GET_SCENE_FEED, { 
-                roomId: Number(effectiveSceneId), 
-                page: currentPageRef.current, 
-                size: 10 
-              });
-              websocketService.getVoteHistory(Number(effectiveSceneId));
-              websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-                roomId: Number(effectiveSceneId)
-              });
-            } else {
-              console.error("WebSocket connection failed");
-            }
-            setLoading(false);
-            // 重置loading状态
-            setPostsLoading(false);
-            setVotesLoading(false);
-          }, 2000);
-        }
-      } catch (error) {
-        console.error("Error fetching scene data:", error);
-        toast({
-          title: "Error loading scene data",
-          description: "Could not load the scene data. Using default content.",
-          variant: "destructive"
-        });
+          console.log('✅ 所有三个请求已按顺序发送完成');
+        }, 500); // 第三个请求延迟500ms
+        
+      }, 500); // 第二个请求延迟500ms
+      
+      // 给WebSocket响应一些时间
+      setTimeout(() => {
         setLoading(false);
-      }
-    }, 300);
-    
-    return () => {
-      // 清理定时器
-      clearTimeout(timer);
+        // 如果在超时后仍然没有数据，停止loading状态
+        setTimeout(() => {
+          setPostsLoading(false);
+          setVotesLoading(false);
+        }, 5000); // 额外5秒等待数据
+      }, 1500);
     };
+
+    // 检查WebSocket连接状态（不检查登录状态）
+    if (websocketService.isConnectionOpen()) {
+      console.log('🚀 WebSocket连接已建立，立即加载数据（跳过登录检查）');
+      loadSceneData();
+    } else {
+      console.log('⏳ WebSocket未连接，等待连接建立...');
+      
+      // 使用定时器检查连接状态
+      const connectionCheckTimer = setInterval(() => {
+        if (websocketService.isConnectionOpen()) {
+          clearInterval(connectionCheckTimer);
+          console.log('✅ WebSocket连接已建立，开始加载场景数据');
+          loadSceneData();
+        }
+      }, 500); // 每500ms检查一次
+      
+      // 设置超时兜底机制
+      const timeoutTimer = setTimeout(() => {
+        clearInterval(connectionCheckTimer);
+        console.warn('⚠️ WebSocket连接超时，尝试强制加载数据');
+        loadSceneData(); // 即使没连接也尝试加载
+      }, 10000); // 10秒超时
+      
+      return () => {
+        clearInterval(connectionCheckTimer);
+        clearTimeout(timeoutTimer);
+      };
+    }
   }, [effectiveSceneId]); // 只依赖effectiveSceneId
 
   // 删除重复的WebSocket监听器
@@ -781,20 +897,30 @@ const Scene: React.FC = () => {
       
       // 确保WebSocket连接已建立
       if (websocketService.isConnectionOpen()) {
-        // 获取新场景的推文数据
+        // 按顺序发送三个请求
+        console.log('📤 [1/3] 发送新场景推文数据请求...');
         websocketService.send(Commands.GET_SCENE_FEED, { 
           roomId: Number(newRoomId), 
           page: 0, 
           size: 10 
         });
         
-        // 获取新场景的投票历史记录
-        websocketService.getVoteHistory(Number(newRoomId));
-        
-        // 获取新场景的角色历史
-        websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-          roomId: Number(newRoomId)
-        });
+        // 延迟发送第二个请求
+        setTimeout(() => {
+          console.log('📤 [2/3] 发送新场景投票历史请求...');
+          websocketService.getVoteHistory(Number(newRoomId));
+          
+          // 延迟发送第三个请求
+          setTimeout(() => {
+            console.log('📤 [3/3] 发送新场景角色历史请求...');
+            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+              roomId: Number(newRoomId)
+            });
+            
+            console.log('✅ NPC切换：所有三个请求已按顺序发送完成');
+          }, 500); // 第三个请求延迟500ms
+          
+        }, 500); // 第二个请求延迟500ms
         
         // 给WebSocket响应一些时间
         setTimeout(() => {
@@ -804,21 +930,32 @@ const Scene: React.FC = () => {
           setTimeout(() => {
             setPostsLoading(false);
             setVotesLoading(false);
-          }, 2000); // 额外2秒等待数据
+          }, 5000); // 额外5秒等待数据
         }, 1500);
       } else {
         console.warn("WebSocket connection not established, waiting for connection...");
         setTimeout(() => {
           if (websocketService.isConnectionOpen()) {
+            // 连接建立后也按顺序发送
+            console.log('📤 [1/3] 连接恢复后发送推文数据请求...');
             websocketService.send(Commands.GET_SCENE_FEED, { 
               roomId: Number(newRoomId), 
               page: 0, 
               size: 10 
             });
-            websocketService.getVoteHistory(Number(newRoomId));
-            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-              roomId: Number(newRoomId)
-            });
+            
+            setTimeout(() => {
+              console.log('📤 [2/3] 连接恢复后发送投票历史请求...');
+              websocketService.getVoteHistory(Number(newRoomId));
+              
+              setTimeout(() => {
+                console.log('📤 [3/3] 连接恢复后发送角色历史请求...');
+                websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+                  roomId: Number(newRoomId)
+                });
+              }, 500);
+              
+            }, 500);
           }
           setLoading(false);
           setNpcSwitchLoading(false);
