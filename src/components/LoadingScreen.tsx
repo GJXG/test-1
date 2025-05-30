@@ -86,23 +86,23 @@ const LoadingScreen: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-900 to-purple-900">
-      <div className="w-full max-w-md space-y-8 px-4">
+      <div className="w-full max-w-md space-y-4 px-4">
         {/* Logo */}
         <div className="flex justify-center">
           <img 
             src="/logo.png" 
             alt="DraMai Logo" 
-            className="h-28 w-auto object-contain animate-pulse"
+            className="h-20 w-auto object-contain animate-pulse"
           />
         </div>
         
         {/* Loading Text */}
-        <h1 className="text-center text-3xl font-bold text-white">
-          Loading DraMai Dreamscape
+        <h1 className="text-center text-2xl font-bold text-white whitespace-nowrap">
+          Loading DraMa.i AI Drama Series
         </h1>
         
         {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+        <div className="w-full bg-gray-200 rounded-full h-2.5 mt-3">
           <div 
             className="bg-indigo-400 h-2.5 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${Math.min(Math.round(progress), 100)}%` }}
@@ -110,17 +110,17 @@ const LoadingScreen: React.FC = () => {
         </div>
         
         {/* Progress Percentage */}
-        <p className="text-center text-white">
+        <p className="text-center text-white mt-2">
           {Math.min(Math.round(progress), 100)}% Complete
         </p>
         
         {/* Status Message */}
-        <p className="text-center text-indigo-200 text-sm animate-pulse">
-          {loaded ? 'Ready! Redirecting...' : 'Initializing the dreamscape...'}
+        <p className="text-center text-indigo-200 text-sm animate-pulse mt-2">
+          {loaded ? 'Ready! Redirecting...' : 'Initializing live streaming...'}
         </p>
         
         {/* Loading Messages */}
-        <div className="mt-8 text-center">
+        <div className="mt-4 text-center">
           <p className="text-indigo-300 text-xs">
             {progress < 30 ? "Loading assets..." : 
              progress < 60 ? "Preparing the experience..." : 
