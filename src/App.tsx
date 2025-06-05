@@ -9,7 +9,7 @@ import Index from "./pages/Index";
 import Scene from "./pages/Scene";
 import NotFound from "./pages/NotFound";
 import Mobile from "./pages/Mobile";
-import CocosEmbed, { GlobalIframe } from "./components/CocosEmbed";
+import { GlobalIframe, CocosProvider } from "./components/CocosEmbed";
 import LoadingScreen from "./components/LoadingScreen";
 import useIsMobile from './hooks/useIsMobile';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -74,7 +74,7 @@ const App: React.FC = () => {
 
   return (
     <>
-      <CocosEmbed>
+      <CocosProvider>
         <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
@@ -86,7 +86,7 @@ const App: React.FC = () => {
             </TooltipProvider>
           </QueryClientProvider>
         </GoogleOAuthProvider>
-      </CocosEmbed>
+      </CocosProvider>
       <GlobalIframe />
     </>
   );

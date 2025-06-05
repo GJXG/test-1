@@ -15,15 +15,12 @@ interface CocosContextType {
   sendUserEmail: (email: string, loginType?: number) => void;
 }
 
-export const CocosContext = createContext<CocosContextType | null>(null);
+const CocosContext = createContext<CocosContextType | null>(null);
 
 // 全局状态，确保 iframe 一直存在
 export const iframeRef = React.createRef<HTMLIFrameElement>();
-let isGlobalInitialized = false;
-let globalSetShowIframe: ((show: boolean) => void) | null = null;
-let globalSetPosition: ((position: 'hidden' | 'container') => void) | null = null;
 
-// 全局方法，用于发送消息到 iframe
+// 全局方法，用于发送消息到 iframe （保留作为备用）
 const sendMessageToIframe = (message: any) => {
   if (iframeRef.current?.contentWindow) {
     iframeRef.current.contentWindow.postMessage(message, '*');
@@ -36,140 +33,9 @@ const sendMessageToIframe = (message: any) => {
 export const useCocos = () => {
   const context = useContext(CocosContext);
   if (!context) {
-    throw new Error('useCocos must be used within a CocosProvider');
+    throw new Error('useCocos must be used within a CocosEmbed');
   }
   return context;
-};
-
-// 创建一个全局的CocosProvider，不参与iframe定位
-export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<string>('');
-  const [messageLog, setMessageLog] = useState<string[]>([]);
-  const [showIframe, setShowIframe] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-
-  const sendMessageToGame = (message: any) => {
-    sendMessageToIframe(message);
-    setMessageLog(prev => [...prev, `Sent: ${JSON.stringify(message)}`]);
-  };
-
-  const sendUserEmail = (email: string, loginType?: number) => {
-    const userEmailMessage = {
-      type: 'USER_LOGIN',
-      action: 'setUserEmail',
-      data: {
-        email: email,
-        timestamp: new Date().toISOString(),
-        source: 'react_parent',
-        loginType: loginType || 1
-      }
-    };
-    sendMessageToGame(userEmailMessage);
-    console.log('React: 发送用户邮箱到游戏 ->', email, '登录类型:', loginType || 1);
-  };
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "toggleMute",
-        isMuted: !isMuted
-      }
-    });
-  };
-
-  const navigateToScene = (target: string) => {
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "navigate",
-        target: target
-      }
-    });
-    console.log(`Navigating to scene: ${target}`);
-  };
-
-  useEffect(() => {
-    // 处理从 iframe 接收的消息
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        if (event.data.type === 'GAME_LOADED') {
-          setIsConnected(true);
-          console.log('React: 游戏iframe已加载');
-          
-          // 检查是否有已登录的用户信息，如果有则发送邮箱
-          const storedUserInfo = localStorage.getItem('userInfo');
-          const storedLoginStatus = localStorage.getItem('isSignedIn');
-          
-          if (storedUserInfo && storedLoginStatus === 'true') {
-            try {
-              const userInfo = JSON.parse(storedUserInfo);
-              if (userInfo.userId && userInfo.userId.includes('@')) {
-                sendUserEmail(userInfo.userId, 1);
-              }
-            } catch (error) {
-              console.error('解析用户信息失败:', error);
-            }
-          }
-          
-          // 发送初始场景数据
-          sendMessageToGame({
-            type: 'INIT_SCENE',
-            data: {
-              scenes: []
-            }
-          });
-        }
-        setLastMessage(JSON.stringify(event.data));
-        setMessageLog(prev => [...prev, `Received: ${JSON.stringify(event.data)}`]);
-      } catch (error) {
-        console.error('Error handling message:', error);
-      }
-    };
-
-    // 监听localStorage变化（用户登录状态变化）
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'userInfo' && event.newValue) {
-        try {
-          const userInfo = JSON.parse(event.newValue);
-          const isSignedIn = localStorage.getItem('isSignedIn');
-          
-          if (isSignedIn === 'true' && userInfo.userId && userInfo.userId.includes('@')) {
-            sendUserEmail(userInfo.userId, 1);
-          }
-        } catch (error) {
-          console.error('处理用户登录状态变化失败:', error);
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('message', handleMessage);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
-  return (
-    <CocosContext.Provider value={{ 
-      sendMessageToGame, 
-      isConnected, 
-      lastMessage, 
-      messageLog,
-      showIframe,
-      setShowIframe,
-      navigateToScene,
-      isMuted,
-      toggleMute,
-      sendUserEmail
-    }}>
-      {children}
-    </CocosContext.Provider>
-  );
 };
 
 // 全局组件，管理唯一的iframe
@@ -177,38 +43,24 @@ export const GlobalIframe: React.FC = () => {
   const [showIframe, setShowIframe] = useState(false);
   const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
   
-  useEffect(() => {
-    globalSetShowIframe = setShowIframe;
-    globalSetPosition = setPosition;
-    return () => {
-      globalSetShowIframe = null;
-      globalSetPosition = null;
-    };
-  }, []);
-  
   return (
     <>
-      {/* 单一iframe，根据position状态切换显示模式 */}
-      <iframe
-        ref={iframeRef}
-        src="https://dramai.world/webframe/"
-        className={
-          position === 'hidden' 
-            ? "fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none border-0"
-            : `fixed inset-0 w-full h-full border-0 transition-opacity duration-500 z-[999] ${
-          showIframe ? 'opacity-100' : 'opacity-0 pointer-events-none'
-              }`
-        }
-        style={{ 
-          zIndex: position === 'hidden' ? -1 : 999,
-          borderRadius: position === 'container' ? '8px' : '0'
-        }}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        referrerPolicy="no-referrer"
-        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-        loading="lazy"
-        title={position === 'hidden' ? "Game Embed Preloader" : "Game Embed"}
-      />
+      {/* 单一iframe，仅在隐藏状态下预加载 */}
+      {position === 'hidden' && (
+        <iframe
+          ref={iframeRef}
+          src="https://dramai.world/webframe/"
+          className="fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none border-0"
+          style={{ 
+            zIndex: -1
+          }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          referrerPolicy="no-referrer"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+          loading="lazy"
+          title="Game Embed Preloader"
+        />
+      )}
     </>
   );
 };
@@ -228,9 +80,17 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
   
   // 容器ref，用于iframe定位
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const localIframeRef = React.useRef<HTMLIFrameElement>(null);
 
   const sendMessageToGame = (message: any) => {
-    sendMessageToIframe(message);
+    // 优先使用本地iframe，如果不存在则使用全局iframe
+    const targetIframe = localIframeRef.current || iframeRef.current;
+    if (targetIframe?.contentWindow) {
+      targetIframe.contentWindow.postMessage(message, '*');
+      console.log('React: 发送数据到游戏iframe ->', message);
+    } else {
+      console.error('React: iframe contentWindow 未找到');
+    }
     setMessageLog(prev => [...prev, `Sent: ${JSON.stringify(message)}`]);
   };
 
@@ -270,23 +130,6 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
       }
     });
     console.log(`Navigating to scene: ${target}`);
-  };
-
-  // 定位iframe到容器
-  const positionIframeToContainer = () => {
-    if (containerRef.current && iframeRef.current) {
-      const container = containerRef.current;
-      const rect = container.getBoundingClientRect();
-      
-      const iframe = iframeRef.current;
-      iframe.style.position = 'fixed';
-      iframe.style.left = `${rect.left}px`;
-      iframe.style.top = `${rect.top}px`;
-      iframe.style.width = `${rect.width}px`;
-      iframe.style.height = `${rect.height}px`;
-      iframe.style.zIndex = '1000';
-      iframe.style.borderRadius = '8px';
-    }
   };
 
   useEffect(() => {
@@ -354,51 +197,15 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
     };
   }, []);
 
-  // 组件挂载时显示iframe并定位到容器
+  // 组件挂载时显示iframe
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowIframe(true);
-      if (globalSetShowIframe) {
-        globalSetShowIframe(true);
-      }
-      if (globalSetPosition) {
-        globalSetPosition('container');
-      }
-      positionIframeToContainer();
     }, 1000);
-    
-    // 监听窗口大小变化，重新定位iframe
-    const handleResize = () => {
-      positionIframeToContainer();
-    };
-    
-    window.addEventListener('resize', handleResize);
     
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('resize', handleResize);
       setShowIframe(false);
-      if (globalSetShowIframe) {
-        globalSetShowIframe(false);
-      }
-      if (globalSetPosition) {
-        globalSetPosition('hidden');
-      }
-    };
-  }, []);
-
-  // 当容器大小变化时重新定位iframe
-  useEffect(() => {
-    const resizeObserver = new ResizeObserver(() => {
-      positionIframeToContainer();
-    });
-    
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-    
-    return () => {
-      resizeObserver.disconnect();
     };
   }, []);
   
@@ -419,9 +226,23 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
         ref={containerRef}
         className={cn("relative w-full h-full bg-white rounded-lg overflow-hidden", className)}
       >
+        {/* 本地iframe，完全位于容器内 */}
+        {showIframe && (
+          <iframe
+            ref={localIframeRef}
+            src="https://dramai.world/webframe/"
+            className="absolute inset-0 w-full h-full border-0 rounded-lg z-10"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            referrerPolicy="no-referrer"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+            loading="lazy"
+            title="Game Embed"
+          />
+        )}
+        
         {/* 加载指示器 */}
         {!showIframe && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white rounded-lg">
+          <div className="absolute inset-0 flex items-center justify-center bg-white rounded-lg z-20">
             <div className="text-center text-gray-800">
               <div className="animate-spin h-8 w-8 border-4 border-gray-400 border-t-transparent rounded-full mx-auto mb-4"></div>
               <p className="text-sm opacity-80">Loading Game...</p>

@@ -141,3 +141,13 @@
     transform-origin: bottom left;
   }
 }
+
+/* 自定义慢速脉冲动画 */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
