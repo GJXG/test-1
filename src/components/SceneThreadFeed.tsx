@@ -296,6 +296,31 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
     }
   };
 
+const timeAgo = (timestamp: number) => {
+      if (typeof timestamp !== 'number' || isNaN(timestamp)) {
+        console.error('Invalid timestamp provided:', timestamp);
+        return 'Just now'; // Fallback for invalid timestamps
+      }
+    
+      //const now = new Date();
+      const secondsAgo = Math.floor(timestamp / 1000); // Use .getTime() for clarity
+      const minutesAgo = Math.floor(secondsAgo / 60);
+      const hoursAgo = Math.floor(minutesAgo / 60);
+      const daysAgo = Math.floor(hoursAgo / 24);
+      const yearsAgo = Math.floor(daysAgo / 365);
+    
+      if (yearsAgo >= 1) {
+        return `${yearsAgo} year${yearsAgo > 1 ? 's' : ''} ago`;
+      } else if (daysAgo >= 1) {
+        return `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+      } else if (hoursAgo >= 1) {
+        return `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`;
+      } else if (minutesAgo >= 1) {
+        return `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`;
+      } else {
+        return `${secondsAgo} second${secondsAgo !== 1 ? 's' : ''} ago`;
+      }
+    }
   const isPostLiked = (post: AIPost) => {
     return localLikes[post.id] !== undefined ? localLikes[post.id] : post.like;
   };
@@ -330,7 +355,7 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
         <div className="flex items-center space-x-2 mb-[-5px]">
           <span className="font-medium text-sm">{comment.nickName}</span>
           {comment.createTime && (
-            <span className="text-xs text-gray-500">{formatTime(comment.createTime)}</span>
+            <span className="text-xs text-gray-500">{timeAgo(comment.createTime)}</span>
           )}
         </div>
         <p className="text-sm text-gray-400 mt-0">{comment.content}</p>
@@ -524,7 +549,7 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
               <span className="font-medium text-[#4A95E7] text-base capitalize">
                 {getNpcName(post.npcId)}
               </span>
-              <span className="text-gray-400 text-sm">{formatTime(post.createTime)}</span>
+              <span className="text-gray-400 text-sm">{timeAgo(post.createTime)}</span>
             </div>
             <p className="text-gray-600 text-sm mt-0.3 line-clamp-2 leading-[0.8]">
               {post.content}

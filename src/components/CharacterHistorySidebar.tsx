@@ -52,6 +52,32 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
     }
   };
 
+  const timeAgo = (timestamp: number) => {
+    if (typeof timestamp !== 'number' || isNaN(timestamp)) {
+      console.error('Invalid timestamp provided:', timestamp);
+      return 'Just now'; // Fallback for invalid timestamps
+    }
+  
+    //const now = new Date();
+    const secondsAgo = Math.floor(timestamp / 1000); // Use .getTime() for clarity
+    const minutesAgo = Math.floor(secondsAgo / 60);
+    const hoursAgo = Math.floor(minutesAgo / 60);
+    const daysAgo = Math.floor(hoursAgo / 24);
+    const yearsAgo = Math.floor(daysAgo / 365);
+  
+    if (yearsAgo >= 1) {
+      return `${yearsAgo} year${yearsAgo > 1 ? 's' : ''} ago`;
+    } else if (daysAgo >= 1) {
+      return `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+    } else if (hoursAgo >= 1) {
+      return `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`;
+    } else if (minutesAgo >= 1) {
+      return `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`;
+    } else {
+      return `${secondsAgo} second${secondsAgo !== 1 ? 's' : ''} ago`;
+    }
+  }
+
   const handleCharacterClick = (npcId: number) => {
     // 执行场景导航
     const jumpToSceneId = npcId.toString();
@@ -136,7 +162,7 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
                 <div className="flex items-center space-x-2">
                   <span className="font-medium text-[#4A95E7] text-base capitalize">{getNpcName(character.npcId)}</span>
                   {character.lastChatTime ? (
-                    <span className="text-gray-400 text-sm">{formatRelativeTime(character.lastChatTime)}</span>
+                    <span className="text-gray-400 text-sm">{timeAgo(character.lastChatTime)}</span>
                   ) : null}
                 </div>
                 <p className={cn(
