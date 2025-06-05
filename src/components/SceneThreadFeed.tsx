@@ -19,6 +19,7 @@ interface SceneThreadFeedProps {
   roomId?: number;
   currentPage?: number;
   onPageChange?: (page: number) => void;
+  selectedEpisode?: number | null;
 }
 
 // 进度条颜色列表
@@ -41,7 +42,8 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
   onComment,
   roomId = 0,
   currentPage = 0,
-  onPageChange
+  onPageChange,
+  selectedEpisode = null
 }) => {
   const [expandedPosts, setExpandedPosts] = useState<Record<number, boolean>>({});
   const [newComment, setNewComment] = useState<Record<number, string>>({});
@@ -313,6 +315,28 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
       letter: "",
       content: optionText
     };
+  };
+
+  // 从图片URL中提取图片名称（不包含扩展名）
+  const getImageNameFromUrl = (imgUrl: string): string => {
+    if (!imgUrl) return 'Expand';
+    
+    try {
+      // 从URL中提取文件名
+      const filename = imgUrl.split('/').pop() || '';
+      
+      // 匹配 EP{数字}-{数字}.png 格式并提取名称部分
+      const match = filename.match(/^(EP\d+-\d+)\.png$/i);
+      if (match) {
+        return match[1]; // 返回 EP15-7 这样的格式
+      }
+      
+      // 如果不匹配预期格式，返回文件名（去掉扩展名）
+      return filename.replace(/\.[^/.]+$/, '') || 'Expand';
+    } catch (error) {
+      console.error('Failed to extract image name from URL:', error);
+      return 'Expand';
+    }
   };
 
   const renderComment = (comment: TweetComment, level = 0) => (
@@ -627,21 +651,9 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
             <span className="text-sm">{post.likeCount}</span>
           </button>
 
-          <button 
-            className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 ml-auto"
-            onClick={() => toggleExpand(post.id)}
-          >
-            {expandedPosts[post.id] ? (
-              <>
-                <ChevronUp size={20} />
-              </>
-            ) : (
-              <>
-                <ChevronDown size={20} />
-                <span className="text-sm">Expand</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center space-x-1 text-gray-500 ml-auto">
+            <span className="text-sm">{getImageNameFromUrl(post.imgUrl)}</span>
+          </div>
         </div>
 
         {expandedPosts[post.id] && (
@@ -709,8 +721,28 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
           </div>
         </div>
       ) : posts.length === 0 ? (
-        <div className="flex justify-center items-center h-64 text-gray-500">
-          No content
+        <div className="flex flex-col justify-center items-center h-64 text-gray-500">
+          {selectedEpisode === null ? (
+            <>
+              <div className="text-center">
+                <div className="text-4xl mb-4">📺</div>
+                <h3 className="text-lg font-medium mb-2">Select an Episode</h3>
+                <p className="text-sm text-gray-400">
+                  Click "Select EP" above to choose an episode and view its content
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-center">
+                <div className="text-4xl mb-4">📷</div>
+                <h3 className="text-lg font-medium mb-2">No content for EP{selectedEpisode}</h3>
+                <p className="text-sm text-gray-400">
+                  This episode may not have any images or videos yet
+                </p>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <>

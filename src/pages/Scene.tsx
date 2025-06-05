@@ -103,6 +103,39 @@ const filterVotesByScene = (votes: VoteHistory[], sceneId: string): VoteHistory[
   return filtered;
 };
 
+// 添加根据EP过滤推文的函数
+const filterPostsByEpisode = (posts: AIPost[], episodeNumber: number | null): AIPost[] => {
+  if (episodeNumber === null) {
+    return []; // 如果没有选择EP，返回空数组，鼓励用户选择EP
+  }
+  
+  return posts.filter(post => {
+    if (!post.imgUrl && !post.videoUrl) {
+      return false; // 没有媒体内容的post不显示
+    }
+    
+    // 检查图片URL
+    if (post.imgUrl) {
+      const match = post.imgUrl.match(/EP(\d+)-\d+\.(png|jpg|jpeg)$/i);
+      if (match) {
+        const postEpisode = parseInt(match[1]);
+        return postEpisode === episodeNumber;
+      }
+    }
+    
+    // 检查视频URL（如果有类似的命名模式）
+    if (post.videoUrl) {
+      const match = post.videoUrl.match(/EP(\d+)-\d+\.(mp4|avi|mov)$/i);
+      if (match) {
+        const postEpisode = parseInt(match[1]);
+        return postEpisode === episodeNumber;
+      }
+    }
+    
+    return false; // 不匹配EP格式的内容不显示
+  });
+};
+
 const Scene: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -136,6 +169,8 @@ const Scene: React.FC = () => {
     if (sceneId !== lastSceneId) {
       setLastSceneId(sceneId);
       setCurrentPage(0); // 重置页码
+      // 切换场景时重置EP过滤，避免在新场景中显示错误的过滤结果
+      setSelectedEpisode(null);
       // 不需要显式调用fetchSceneData()，因为effectiveSceneId的变化会触发主要useEffect
       console.log('Scene ID changed:', { from: lastSceneId, to: sceneId });
     }
@@ -171,6 +206,9 @@ const Scene: React.FC = () => {
   const { sendMessageToGame, navigateToScene } = useCocos();
   const [isUserInfoFolded, setIsUserInfoFolded] = useState(false);
   const [npcSwitchLoading, setNpcSwitchLoading] = useState(false); // 添加NPC切换加载状态
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false); // 添加Header折叠状态
+  const [showEpisodeList, setShowEpisodeList] = useState(false); // 添加Episode列表显示状态
+  const [selectedEpisode, setSelectedEpisode] = useState<number | null>(null); // 添加选中的EP状态
 
   // Check login status on component mount
   useEffect(() => {
@@ -504,7 +542,7 @@ const Scene: React.FC = () => {
     console.log(`📄 切换到新页面，页码: ${newPage}, 当前aiPosts数据量: ${aiPosts.length}`);
     
     // 立即更新状态和引用，确保后续逻辑能获取到最新的页码
-    currentPageRef.current = newPage; // 先更新ref，确保在状态更新前就能获取到新值
+    currentPageRef.current = newPage;
     setCurrentPage(newPage);  // 然后更新状态
     
     console.log(`📄 currentPageRef.current已更新为 ${currentPageRef.current}`);
@@ -852,10 +890,12 @@ const Scene: React.FC = () => {
   }, [isSignedIn, effectiveSceneId]);
 
   // 使用useMemo缓存过滤后的结果
-  const filteredPosts = React.useMemo(
-    () => filterPostsByScene(aiPosts, effectiveSceneId),
-    [aiPosts, effectiveSceneId]
-  );
+  const filteredPosts = React.useMemo(() => {
+    // 首先按场景过滤
+    const sceneFilteredPosts = filterPostsByScene(aiPosts, effectiveSceneId);
+    // 然后按EP过滤
+    return filterPostsByEpisode(sceneFilteredPosts, selectedEpisode);
+  }, [aiPosts, effectiveSceneId, selectedEpisode]);
   
   const filteredVotes = React.useMemo(
     () => filterVotesByScene(voteHistory, effectiveSceneId),
@@ -866,6 +906,51 @@ const Scene: React.FC = () => {
     () => filterNpcsByScene(characterHistory, effectiveSceneId),
     [characterHistory, effectiveSceneId]
   );
+
+  // 处理EP选择
+  const handleEpisodeSelect = React.useCallback((episodeNumber: number) => {
+    console.log(`EP${episodeNumber} selected, loading data from server...`);
+    setSelectedEpisode(episodeNumber);
+    setShowEpisodeList(false); // 选择后关闭列表
+    
+    // 清空当前数据，显示加载状态
+    setAiPosts([]);
+    setPostsLoading(true);
+    
+    // 重置页码为0，因为这是新的EP过滤
+    setCurrentPage(0);
+    currentPageRef.current = 0;
+    
+    // 从服务器重新加载指定EP的数据
+    if (websocketService.isConnectionOpen()) {
+      console.log(`📤 Loading data for EP${episodeNumber} from server...`);
+      
+      // 发送请求时可以添加EP参数，如果后端支持的话
+      // 这里先发送标准请求，然后在客户端过滤
+      websocketService.send(Commands.GET_SCENE_FEED, { 
+        roomId: Number(effectiveSceneId), 
+        page: 0, 
+        size: 50, // 增加数量以获取更多数据用于EP过滤
+        episode: episodeNumber // 如果后端支持EP过滤参数
+      });
+      
+      // 设置超时保护
+      setTimeout(() => {
+        if (postsLoading) {
+          console.log(`EP${episodeNumber} data loading timeout, resetting loading state`);
+          setPostsLoading(false);
+        }
+      }, 10000);
+    } else {
+      console.error('WebSocket connection not available');
+      setPostsLoading(false);
+    }
+    
+    toast({
+      title: "Loading Episode",
+      description: `Loading content for EP${episodeNumber}...`
+    });
+  }, [effectiveSceneId, setSelectedEpisode, setShowEpisodeList, setAiPosts, setPostsLoading, setCurrentPage, postsLoading]);
 
   // 处理选择NPC事件
   const handleSelectNpc = React.useCallback((npcId: number) => {
@@ -999,6 +1084,8 @@ const Scene: React.FC = () => {
           className="flex-shrink-0" 
           selectedTag={getTagFromSceneId(sceneId)}
           onLogoClick={handleLogoClick}
+          isCollapsed={isHeaderCollapsed}
+          onToggleCollapse={(collapsed) => setIsHeaderCollapsed(collapsed)}
         />
         
         {loading ? (
@@ -1009,16 +1096,78 @@ const Scene: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col md:flex-row p-4 gap-4 overflow-hidden">
-            {/* Game Embed */}
-            <div className="w-full md:w-[510px] h-full flex-shrink-0 mb-4 md:mb-0 overflow-y-auto">
-              <CocosEmbed sceneId={gameSceneId} className="h-full" />
+          <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
+            {/* Game Embed Container - 维持486:864比例 */}
+            <div 
+              className="flex-shrink-0 w-full lg:w-auto max-w-full" 
+              style={{ 
+                aspectRatio: '486/864',
+                minHeight: '300px' // 确保在极小屏幕上也有最小高度
+              }}
+            >
+              <div className="w-full h-full relative rounded-lg overflow-hidden bg-white shadow-md">
+                <CocosEmbed sceneId={gameSceneId} className="w-full h-full" />
+              </div>
             </div>
             
-            {/* Content Columns Container */}
-            <div className="flex-1 flex gap-4 h-full">
-              {/* Thread Feed */}
-              <div className="flex-1 h-full overflow-y-auto border border-gray-200 rounded-lg p-4">
+            {/* Content Columns Container - 与Cocos容器同宽的基础上分配Thread和Vote */}
+            <div className="flex-1 flex flex-col lg:flex-row gap-4 h-full min-w-0">
+              {/* Thread Feed - 2/3 宽度 */}
+              <div className="flex-[2] h-full flex flex-col gap-2 min-w-0">
+                {/* Banner - 宽高比 1044:234 */}
+                <div 
+                  className="w-full bg-gray-100 border border-gray-200 rounded-lg shadow-sm overflow-hidden"
+                  style={{ aspectRatio: '1044/234' }}
+                >
+                  <div className="relative w-full h-full">
+                    <img
+                      src="/banner.png"
+                      alt="Scene Banner"
+                      className="w-full h-full object-cover"
+                    />
+                    {/* 右下角按钮 */}
+                    <button
+                      onClick={() => setShowEpisodeList(!showEpisodeList)}
+                      className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/80 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200"
+                    >
+                      {showEpisodeList ? 'fold' : selectedEpisode ? `EP${selectedEpisode}` : 'Select EP'}
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Episode 列表 - 只在showEpisodeList为true时显示 */}
+                <div 
+                  className={`w-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300 ease-in-out ${
+                    showEpisodeList 
+                      ? 'max-h-40 opacity-100' 
+                      : 'max-h-0 opacity-0'
+                  }`}
+                >
+                  <div className="h-32 overflow-y-auto p-4">
+                    <div className="grid grid-cols-5 gap-3">
+                      {Array.from({ length: 15 }, (_, index) => {
+                        const episodeNumber = 15 - index; // 从EP15开始倒序
+                        const isSelected = selectedEpisode === episodeNumber;
+                        return (
+                          <button
+                            key={episodeNumber}
+                            className={`font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm ${
+                              isSelected
+                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            }`}
+                            onClick={() => handleEpisodeSelect(episodeNumber)}
+                          >
+                            EP{episodeNumber}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Thread Feed */}
+                <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                 <SceneThreadFeed 
                   posts={filteredPosts} 
                   loading={postsLoading} 
@@ -1029,16 +1178,33 @@ const Scene: React.FC = () => {
                   roomId={Number(effectiveSceneId)}
                   currentPage={currentPage}
                   onPageChange={handlePageChange}
+                  selectedEpisode={selectedEpisode}
                 />
+                </div>
               </div>
               
-              {/* Vote History */}
-              <div className="flex-1 h-full overflow-y-auto border border-gray-200 rounded-lg p-4">
+              {/* Vote History - 1/3 宽度 (scene thread的1/2) */}
+              <div className="flex-1 h-full flex flex-col gap-4 min-w-0">
+                {/* Vote Banner - 宽高比 522:234 */}
+                <div 
+                  className="w-full bg-gray-100 border border-gray-200 rounded-lg shadow-sm overflow-hidden"
+                  style={{ aspectRatio: '522/234' }}
+                >
+                  <img
+                    src="/vote_banner.png"
+                    alt="Vote Banner"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                {/* Vote History Panel */}
+                <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                 <VoteHistoryPanel 
                   voteHistory={filteredVotes} 
                   currentSceneId={effectiveSceneId}
                   loading={votesLoading}
                 />
+                </div>
               </div>
             </div>
           </div>
