@@ -389,8 +389,10 @@ const Scene: React.FC = () => {
   }, [effectiveSceneId]);
   
   const handleCharacterHistory = React.useCallback((event: any) => {
+    console.log('🎭 handleCharacterHistory called with event:', event);
+    
     if (event && event.data && event.data.playerNpcChatDataMap) {
-      console.log('Received character history data:', event.data);
+      console.log('🎭 Received character history data:', event.data);
       // 构建角色历史数据
       const characters: CharacterHistory[] = [];
       
@@ -458,8 +460,11 @@ const Scene: React.FC = () => {
         }
       });
       
+      console.log('🎭 Setting characterHistory with', characters.length, 'characters:', characters.map(c => ({ npcId: c.npcId, name: c.name, roomId: c.roomId })));
       setCharacterHistory(characters);
-      console.log('Updated characterHistory with', characters.length, 'characters');
+      console.log('🎭 Updated characterHistory with', characters.length, 'characters');
+    } else {
+      console.warn('🎭 No character history data received:', event);
     }
   }, []);
 
@@ -907,6 +912,17 @@ const Scene: React.FC = () => {
     [characterHistory, effectiveSceneId]
   );
 
+  // 添加调试日志
+  React.useEffect(() => {
+    console.log('🏠 Scene Debug - Character Data:', {
+      effectiveSceneId,
+      characterHistoryLength: characterHistory.length,
+      filteredCharactersLength: filteredCharacters.length,
+      characterHistory: characterHistory.map(c => ({ npcId: c.npcId, name: c.name, roomId: c.roomId })),
+      filteredCharacters: filteredCharacters.map(c => ({ npcId: c.npcId, name: c.name, roomId: c.roomId }))
+    });
+  }, [characterHistory, filteredCharacters, effectiveSceneId]);
+
   // 处理EP选择
   const handleEpisodeSelect = React.useCallback((episodeNumber: number) => {
     console.log(`EP${episodeNumber} selected, loading data from server...`);
@@ -1060,6 +1076,33 @@ const Scene: React.FC = () => {
       });
     }
   }, [effectiveSceneId, navigate, setAiPosts, setVoteHistory, setCharacterHistory, setLoading, setPostsLoading, setVotesLoading, setNpcSwitchLoading, navigateToScene]);
+
+  // 添加测试用模拟数据
+  React.useEffect(() => {
+    if (characterHistory.length === 0) {
+      console.log('🧪 Adding mock character data for testing...');
+      const mockCharacters: CharacterHistory[] = [
+        {
+          roomId: effectiveSceneId,
+          npcId: 10016,
+          name: 'Test Character 1',
+          description: 'This is a test character to verify sidebar display',
+          imageUrl: '/images/scene/headDir_10016.png',
+          lastChatTime: Date.now() / 1000
+        },
+        {
+          roomId: effectiveSceneId,
+          npcId: 10017,
+          name: 'Test Character 2',
+          description: 'Another test character for sidebar verification',
+          imageUrl: '/images/scene/headDir_10017.png',
+          lastChatTime: Date.now() / 1000 - 3600
+        }
+      ];
+      setCharacterHistory(mockCharacters);
+      console.log('🧪 Mock character data added:', mockCharacters);
+    }
+  }, [effectiveSceneId, characterHistory.length]);
 
   // 渲染内容
   return (
