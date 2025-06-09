@@ -1,10 +1,11 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Loader2, LogOut, ChevronDown } from 'lucide-react';
+import { Loader2, LogOut, ChevronDown, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import GoogleLoginButton from './GoogleLoginButton';
 import AppleLoginButton from './AppleLoginButton';
 import AuthError from './AuthError';
+import useUserPoints from '@/hooks/useUserPoints';
 
 interface UserInfo {
   userId: string;
@@ -38,6 +39,9 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
   const [error, setError] = React.useState<string | null>(null);
   const [avatarError, setAvatarError] = React.useState(false);
   const [avatarLoading, setAvatarLoading] = React.useState(true);
+  
+  // 使用积分钩子
+  const { points, loading: pointsLoading, error: pointsError, refreshPoints } = useUserPoints();
 
   // 添加处理ID显示的函数
   const formatUserId = (id: string) => {
@@ -65,6 +69,10 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
     setLoading(false);
     setError(null);
     onLogin?.(userInfo);
+    // 登录成功后触发用户登录事件，以便更新积分
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('user-logged-in'));
+    }, 500);
   };
 
   const handleGoogleLoginError = (error: any) => {
@@ -86,6 +94,12 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
 
   const toggleFold = () => {
     onFoldChange?.(!isFolded);
+  };
+
+  // 处理刷新积分
+  const handleRefreshPoints = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    refreshPoints();
   };
 
   return (
@@ -187,11 +201,22 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
                   <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
                     <img src="/icons/imgMoneyIcon.png" alt="Money Icon" className="w-10 h-8" />
                   </div>
-                  <span className="text-amber-700 font-bold text-lg">{userInfo.points}</span>
+                  <div className="flex items-center">
+                    {pointsLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-700 mr-2" />
+                    ) : (
+                      <span className="text-amber-700 font-bold text-lg">{points}</span>
+                    )}
+                    {pointsError && <span className="text-xs text-red-500 ml-2">加载失败</span>}
+                  </div>
                 </div>
-                {/* <button className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors">
-                  <span className="text-amber-700 text-sm font-medium">Earn More →</span>
-                </button> */}
+                <button 
+                  onClick={handleRefreshPoints} 
+                  className="p-1.5 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+                  title="刷新积分"
+                >
+                  <RefreshCw className="w-4 h-4 text-amber-700" />
+                </button>
               </div>
               
               {/* 登出按钮 */}

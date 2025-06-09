@@ -94,6 +94,7 @@ export interface VoteHistory {
   noCount: string;
   myYesCount: string;
   myNoCount: string;
+  imgUrl?: string;
 }
 
 export interface SceneData {

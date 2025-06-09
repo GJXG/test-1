@@ -19,6 +19,17 @@ import CharacterHistorySidebar from '@/components/CharacterHistorySidebar';
 import { websocketService } from '@/services/websocket';
 import { Commands } from '@/services/websocket';
 
+// 定义EP列表接口
+interface EpListItem {
+  id: number;
+  npcList: number[];
+  playerCount: number;
+  bannerUrl: string;
+  order: number;
+  tweetUrl: string;
+  epList: string[];
+}
+
 interface UserInfo {
   userId: string;
   id: string;
@@ -171,6 +182,11 @@ const Scene: React.FC = () => {
       setCurrentPage(0); // 重置页码
       // 切换场景时重置EP过滤，避免在新场景中显示错误的过滤结果
       setSelectedEpisode(null);
+      // 重新获取EP列表，通过handleEpListResponse会自动选择最新的EP
+      setEpListLoading(true);
+      if (websocketService.isConnectionOpen()) {
+        websocketService.getEpList();
+      }
       // 不需要显式调用fetchSceneData()，因为effectiveSceneId的变化会触发主要useEffect
       console.log('Scene ID changed:', { from: lastSceneId, to: sceneId });
     }
@@ -209,6 +225,8 @@ const Scene: React.FC = () => {
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false); // 添加Header折叠状态
   const [showEpisodeList, setShowEpisodeList] = useState(false); // 添加Episode列表显示状态
   const [selectedEpisode, setSelectedEpisode] = useState<number | null>(null); // 添加选中的EP状态
+  const [epListData, setEpListData] = useState<EpListItem[]>([]); // 添加EP列表数据状态
+  const [epListLoading, setEpListLoading] = useState<boolean>(true); // 添加EP列表加载状态
 
   // Check login status on component mount
   useEffect(() => {
@@ -359,10 +377,24 @@ const Scene: React.FC = () => {
         if (vote.myYesCount > 0) userChoice = 'YES';
         else if (vote.myNoCount > 0) userChoice = 'NO';
         
+        // 保留原始content
+        let processedContent = vote.content || "";
+        
+        // 处理imgUrl，只提取EP格式
+        let processedImgUrl = vote.imgUrl;
+        if (processedImgUrl) {
+          const epMatch = processedImgUrl.match(/EP\d+-\d+/);
+          if (epMatch) {
+            processedImgUrl = epMatch[0]; // 只保留EP格式
+          } else {
+            processedImgUrl = ""; // 如果没有匹配到EP格式，则不显示imgUrl
+          }
+        }
+        
         return {
           roomId: effectiveSceneId, // 直接使用当前的effectiveSceneId
           requestId: vote.requestId || index,
-          content: vote.content,
+          content: processedContent,
           hasVoted: vote.myYesCount > 0 || vote.myNoCount > 0,
           userChoice: userChoice,
           correctOption: "unknown", // 这个字段在API响应中没有提供
@@ -371,7 +403,8 @@ const Scene: React.FC = () => {
           yesCount: vote.yesCount?.toString() || "0",
           noCount: vote.noCount?.toString() || "0",
           myYesCount: vote.myYesCount?.toString() || "0",
-          myNoCount: vote.myNoCount?.toString() || "0"
+          myNoCount: vote.myNoCount?.toString() || "0",
+          imgUrl: processedImgUrl // 使用处理后的imgUrl
         };
       });
       
@@ -463,6 +496,55 @@ const Scene: React.FC = () => {
     }
   }, []);
 
+  // 处理页面切换
+  const handlePageChange = React.useCallback((newPage: number) => {
+    console.log(`📄 切换到新页面，页码: ${newPage}, 当前aiPosts数据量: ${aiPosts.length}`);
+    
+    // 立即更新状态和引用，确保后续逻辑能获取到最新的页码
+    currentPageRef.current = newPage;
+    setCurrentPage(newPage);  // 然后更新状态
+    
+    console.log(`📄 currentPageRef.current已更新为 ${currentPageRef.current}`);
+    
+    // 只更新推文数据，不触发整个页面重新加载
+    if (websocketService.isConnectionOpen()) {
+      console.log(`📤 设置加载状态 postsLoading=true`);
+      setPostsLoading(true); // 设置推文加载状态
+      
+      // 获取新页面的数据（翻页时通常只需要获取推文数据）
+      console.log(`📤 [翻页] 发送推文数据请求，页码: ${newPage}, 房间ID: ${effectiveSceneId}, EP: ${selectedEpisode}`);
+      
+      // 使用setTimeout确保currentPageRef.current已更新
+      setTimeout(() => {
+        console.log(`📤 发送请求前再次检查 - 当前页码: ${currentPageRef.current}, 数据量: ${aiPosts.length}`);
+        
+        // 确保使用最新的页码值
+        const currentRequestPage = currentPageRef.current;
+        console.log(`📤 发送请求使用页码: ${currentRequestPage}`);
+        
+        websocketService.send(Commands.GET_SCENE_FEED, { 
+          roomId: Number(effectiveSceneId), 
+          page: currentRequestPage, // 使用ref中的最新值
+          size: 30,
+          episode: selectedEpisode // 添加EP参数（必须有值，由流程确保）
+        });
+        
+        // 设置超时检查，如果长时间没有收到数据，才会重置loading状态
+        // 避免短时间内重置loading状态，让handleSceneFeed回调有机会处理
+        setTimeout(() => {
+          if (postsLoading) {
+            console.log('📄 请求发出后10秒仍未收到数据，强制结束loading状态');
+            setPostsLoading(false);
+          }
+        }, 10000); // 增加超时时间到10秒
+      }, 0);
+    } else {
+      console.error('WebSocket连接未建立，无法加载更多数据');
+      // 连接未建立时，重置loading状态
+      setPostsLoading(false);
+    }
+  }, [effectiveSceneId, postsLoading, aiPosts.length, selectedEpisode]);
+
   // 处理推文操作响应（点赞、评论等）
   const handleOperateTweetResponse = React.useCallback((event: any) => {
     console.log('💬 Received OPERATE_TWEET response:', event);
@@ -505,7 +587,7 @@ const Scene: React.FC = () => {
       console.log('💬 Refreshing feed data...');
       
       // 只更新推文数据，不触发整个页面重新加载
-      if (websocketService.isConnectionOpen()) {
+      if (websocketService.isConnectionOpen() && selectedEpisode !== null) {
         setPostsLoading(true); // 只设置推文加载状态
         
         // 延迟更长时间后刷新数据，确保服务器端数据已更新
@@ -514,7 +596,8 @@ const Scene: React.FC = () => {
           websocketService.send(Commands.GET_SCENE_FEED, { 
             roomId: Number(effectiveSceneId), 
             page: currentPageRef.current, 
-            size: 10 
+            size: 30,
+            episode: selectedEpisode // 必须有选中的EP
           });
           
           // 短暂延迟后重置加载状态
@@ -535,56 +618,8 @@ const Scene: React.FC = () => {
         variant: "destructive"
       });
     }
-  }, [effectiveSceneId]);
+  }, [effectiveSceneId, selectedEpisode]);
 
-  // 处理页面切换
-  const handlePageChange = React.useCallback((newPage: number) => {
-    console.log(`📄 切换到新页面，页码: ${newPage}, 当前aiPosts数据量: ${aiPosts.length}`);
-    
-    // 立即更新状态和引用，确保后续逻辑能获取到最新的页码
-    currentPageRef.current = newPage;
-    setCurrentPage(newPage);  // 然后更新状态
-    
-    console.log(`📄 currentPageRef.current已更新为 ${currentPageRef.current}`);
-    
-    // 只更新推文数据，不触发整个页面重新加载
-    if (websocketService.isConnectionOpen()) {
-      console.log(`📤 设置加载状态 postsLoading=true`);
-      setPostsLoading(true); // 设置推文加载状态
-      
-      // 获取新页面的数据（翻页时通常只需要获取推文数据）
-      console.log(`📤 [翻页] 发送推文数据请求，页码: ${newPage}, 房间ID: ${effectiveSceneId}`);
-      
-      // 使用setTimeout确保currentPageRef.current已更新
-      setTimeout(() => {
-        console.log(`📤 发送请求前再次检查 - 当前页码: ${currentPageRef.current}, 数据量: ${aiPosts.length}`);
-        
-        // 确保使用最新的页码值
-        const currentRequestPage = currentPageRef.current;
-        console.log(`📤 发送请求使用页码: ${currentRequestPage}`);
-        
-        websocketService.send(Commands.GET_SCENE_FEED, { 
-          roomId: Number(effectiveSceneId), 
-          page: currentRequestPage, // 使用ref中的最新值
-          size: 10
-        });
-        
-        // 设置超时检查，如果长时间没有收到数据，才会重置loading状态
-        // 避免短时间内重置loading状态，让handleSceneFeed回调有机会处理
-        setTimeout(() => {
-          if (postsLoading) {
-            console.log('📄 请求发出后10秒仍未收到数据，强制结束loading状态');
-            setPostsLoading(false);
-          }
-        }, 10000); // 增加超时时间到10秒
-      }, 0);
-    } else {
-      console.error('WebSocket连接未建立，无法加载更多数据');
-      // 连接未建立时，重置loading状态
-      setPostsLoading(false);
-    }
-  }, [effectiveSceneId, postsLoading, aiPosts.length]);
-  
   // 初始化加载和设置WebSocket事件处理器
   useEffect(() => {
     console.log('Initializing WebSocket event handlers');
@@ -608,82 +643,124 @@ const Scene: React.FC = () => {
   useEffect(() => {
     console.log('Loading scene data, sceneId:', sceneId, 'effectiveSceneId:', effectiveSceneId);
     
-    // 定义数据加载函数 - 按顺序发送请求
-    const loadSceneData = () => {
-      console.log(`Starting to fetch scene data sequentially, Scene ID: ${effectiveSceneId}, currentPage: ${currentPageRef.current}`);
-      
-      // 加载场景数据
-      setLoading(true);
-      setPostsLoading(true); // 重置推文加载状态
-      setVotesLoading(true); // 重置投票加载状态
-      
-      // 第一个请求：获取场景推文数据
-      console.log('📤 [1/3] 发送推文数据请求...');
-      websocketService.send(Commands.GET_SCENE_FEED, { 
-        roomId: Number(effectiveSceneId), 
-        page: currentPageRef.current, 
-        size: 10 // 每页10条
-      }, true); // 绕过登录检查
-      
-      // 延迟发送第二个请求：获取投票历史记录
-      setTimeout(() => {
-        console.log('📤 [2/3] 发送投票历史请求...');
-        websocketService.send(Commands.VOTE_THREAD, {
-          roomId: Number(effectiveSceneId)
+    // 如果有选择EP，则在场景数据加载时使用它；否则不发送推文请求，等待EP列表自动选择
+    if (selectedEpisode !== null) {
+      // 定义数据加载函数 - 按顺序发送请求
+      const loadSceneData = () => {
+        console.log(`Starting to fetch scene data sequentially, Scene ID: ${effectiveSceneId}, currentPage: ${currentPageRef.current}, selectedEP: ${selectedEpisode}`);
+        
+        // 加载场景数据
+        setLoading(true);
+        setPostsLoading(true); // 重置推文加载状态
+        setVotesLoading(true); // 重置投票加载状态
+        
+        // 第一个请求：获取场景推文数据
+        console.log('📤 [1/3] 发送推文数据请求...');
+        websocketService.send(Commands.GET_SCENE_FEED, { 
+          roomId: Number(effectiveSceneId), 
+          page: currentPageRef.current, 
+          size: 30, // 每页30条
+          episode: selectedEpisode // 添加EP参数
         }, true); // 绕过登录检查
         
-        // 延迟发送第三个请求：获取角色历史
+        // 延迟发送第二个请求：获取投票历史记录
         setTimeout(() => {
-          console.log('📤 [3/3] 发送角色历史请求...');
-          websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+          console.log('📤 [2/3] 发送投票历史请求...');
+          websocketService.send(Commands.VOTE_THREAD, {
             roomId: Number(effectiveSceneId)
           }, true); // 绕过登录检查
           
-          console.log('✅ 所有三个请求已按顺序发送完成');
-        }, 500); // 第三个请求延迟500ms
+          // 延迟发送第三个请求：获取角色历史
+          setTimeout(() => {
+            console.log('📤 [3/3] 发送角色历史请求...');
+            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+              roomId: Number(effectiveSceneId)
+            }, true); // 绕过登录检查
+            
+            console.log('✅ 所有三个请求已按顺序发送完成');
+          }, 500); // 第三个请求延迟500ms
+          
+        }, 500); // 第二个请求延迟500ms
         
-      }, 500); // 第二个请求延迟500ms
-      
-      // 给WebSocket响应一些时间
-      setTimeout(() => {
-        setLoading(false);
-        // 如果在超时后仍然没有数据，停止loading状态
+        // 给WebSocket响应一些时间
         setTimeout(() => {
-          setPostsLoading(false);
-          setVotesLoading(false);
-        }, 5000); // 额外5秒等待数据
-      }, 1500);
-    };
-
-    // 检查WebSocket连接状态（不检查登录状态）
-    if (websocketService.isConnectionOpen()) {
-      console.log('🚀 WebSocket连接已建立，立即加载数据（跳过登录检查）');
-      loadSceneData();
-    } else {
-      console.log('⏳ WebSocket未连接，等待连接建立...');
-      
-      // 使用定时器检查连接状态
-      const connectionCheckTimer = setInterval(() => {
-        if (websocketService.isConnectionOpen()) {
-          clearInterval(connectionCheckTimer);
-          console.log('✅ WebSocket连接已建立，开始加载场景数据');
-          loadSceneData();
-        }
-      }, 500); // 每500ms检查一次
-      
-      // 设置超时兜底机制
-      const timeoutTimer = setTimeout(() => {
-        clearInterval(connectionCheckTimer);
-        console.warn('⚠️ WebSocket连接超时，尝试强制加载数据');
-        loadSceneData(); // 即使没连接也尝试加载
-      }, 10000); // 10秒超时
-      
-      return () => {
-        clearInterval(connectionCheckTimer);
-        clearTimeout(timeoutTimer);
+          setLoading(false);
+          // 如果在超时后仍然没有数据，停止loading状态
+          setTimeout(() => {
+            setPostsLoading(false);
+            setVotesLoading(false);
+          }, 5000); // 额外5秒等待数据
+        }, 1500);
       };
+  
+      // 检查WebSocket连接状态（不检查登录状态）
+      if (websocketService.isConnectionOpen()) {
+        console.log('🚀 WebSocket连接已建立，立即加载数据（跳过登录检查）');
+        loadSceneData();
+      } else {
+        console.log('⏳ WebSocket未连接，等待连接建立...');
+        
+        // 使用定时器检查连接状态
+        const connectionCheckTimer = setInterval(() => {
+          if (websocketService.isConnectionOpen()) {
+            clearInterval(connectionCheckTimer);
+            console.log('✅ WebSocket连接已建立，开始加载场景数据');
+            loadSceneData();
+          }
+        }, 500); // 每500ms检查一次
+        
+        // 设置超时兜底机制
+        const timeoutTimer = setTimeout(() => {
+          clearInterval(connectionCheckTimer);
+          console.warn('⚠️ WebSocket连接超时，尝试强制加载数据');
+          loadSceneData(); // 即使没连接也尝试加载
+        }, 10000); // 10秒超时
+        
+        return () => {
+          clearInterval(connectionCheckTimer);
+          clearTimeout(timeoutTimer);
+        };
+      }
+    } else {
+      // 如果没有选择EP，只加载角色历史和投票历史，推文由EP列表自动选择处理
+      console.log('没有选择EP，等待EP列表自动选择后加载推文');
+      
+      const loadNonTweetData = () => {
+        setLoading(true);
+        setVotesLoading(true); // 重置投票加载状态
+        
+        if (websocketService.isConnectionOpen()) {
+          // 加载投票历史
+          console.log('📤 [1/2] 发送投票历史请求...');
+          websocketService.send(Commands.VOTE_THREAD, {
+            roomId: Number(effectiveSceneId)
+          }, true);
+          
+          // 加载角色历史
+          setTimeout(() => {
+            console.log('📤 [2/2] 发送角色历史请求...');
+            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+              roomId: Number(effectiveSceneId)
+            }, true);
+          }, 500);
+          
+          // 重置加载状态
+          setTimeout(() => {
+            setLoading(false);
+            setTimeout(() => {
+              setVotesLoading(false);
+            }, 5000);
+          }, 1500);
+        } else {
+          // 连接未建立，设置超时保护
+          setLoading(false);
+          setVotesLoading(false);
+        }
+      };
+      
+      loadNonTweetData();
     }
-  }, [effectiveSceneId]); // 只依赖effectiveSceneId
+  }, [effectiveSceneId, selectedEpisode]);
 
   // 删除重复的WebSocket监听器
   useEffect(() => {
@@ -907,6 +984,115 @@ const Scene: React.FC = () => {
     [characterHistory, effectiveSceneId]
   );
 
+  // 处理EP列表响应
+  const handleEpListResponse = React.useCallback((event: any) => {
+    if (event && event.data && event.data.roomDataList) {
+      console.log('📋 Received EP list data:', event.data);
+      setEpListData(event.data.roomDataList);
+      setEpListLoading(false);
+      
+      // 如果当前没有选中的EP，自动选择最新的EP
+      if (selectedEpisode === null) {
+        // 获取当前场景的EP列表
+        const currentRoomData = event.data.roomDataList.find((room: EpListItem) => 
+          room.id === Number(effectiveSceneId)
+        );
+        
+        if (currentRoomData && currentRoomData.epList && currentRoomData.epList.length > 0) {
+          // 按EP编号排序并获取最大值（最新的EP）
+          const latestEp = [...currentRoomData.epList].sort((a, b) => {
+            const numA = parseInt(a.replace('EP', ''));
+            const numB = parseInt(b.replace('EP', ''));
+            return numB - numA; // 降序排列
+          })[0];
+          
+          // 提取EP编号
+          const latestEpNumber = parseInt(latestEp.replace('EP', ''));
+          console.log(`🔄 自动选择最新的EP: EP${latestEpNumber}`);
+          
+          // 设置选中的EP (这会触发上面的useEffect，加载推文数据)
+          setSelectedEpisode(latestEpNumber);
+          setShowEpisodeList(false);
+          
+          // 清空当前数据，显示加载状态
+          setAiPosts([]);
+          setPostsLoading(true);
+          
+          // 重置页码为0
+          setCurrentPage(0);
+          currentPageRef.current = 0;
+          
+          // 这里不需要手动发送GET_SCENE_FEED请求，因为设置selectedEpisode会触发上面的useEffect
+          toast({
+            title: "Loading Latest Episode",
+            description: `Loading content for EP${latestEpNumber}...`
+          });
+        }
+      }
+    } else {
+      console.warn('Received invalid EP list data:', event);
+      setEpListLoading(false);
+    }
+  }, [selectedEpisode, effectiveSceneId, setSelectedEpisode, setShowEpisodeList, setAiPosts, setPostsLoading, setCurrentPage]);
+
+  // 获取当前场景的EP列表
+  const getCurrentSceneEpList = React.useMemo(() => {
+    if (!epListData || epListData.length === 0) {
+      return [];
+    }
+
+    // 根据当前effectiveSceneId找到对应的roomData
+    const currentRoomData = epListData.find(room => room.id === Number(effectiveSceneId));
+    
+    // 如果找到了匹配的roomData，返回其epList；否则返回空数组
+    if (!currentRoomData) {
+      return [];
+    }
+    
+    // 获取EP列表并按照EP编号从大到小排序
+    return [...currentRoomData.epList].sort((a, b) => {
+      const numA = parseInt(a.replace('EP', ''));
+      const numB = parseInt(b.replace('EP', ''));
+      return numB - numA; // 降序排列，最新的EP在前面
+    });
+  }, [epListData, effectiveSceneId]);
+
+  // 在组件加载时注册EP列表响应处理器并请求EP列表数据
+  useEffect(() => {
+    // 注册处理器
+    websocketService.on(Commands.GET_EP_LIST, handleEpListResponse);
+    
+    // 请求EP列表数据
+    if (websocketService.isConnectionOpen()) {
+      console.log('📤 Requesting EP list on component mount...');
+      websocketService.getEpList();
+      
+      // 设置超时保护
+      setTimeout(() => {
+        if (epListLoading) {
+          console.log('EP list loading timeout, resetting loading state');
+          setEpListLoading(false);
+        }
+      }, 10000);
+    } else {
+      console.error('WebSocket connection not available for EP list');
+      setEpListLoading(false);
+      
+      // 等待连接建立后再次尝试
+      setTimeout(() => {
+        if (websocketService.isConnectionOpen()) {
+          console.log('📤 Retrying EP list request after connection...');
+          websocketService.getEpList();
+        }
+      }, 3000);
+    }
+    
+    // 清理函数
+    return () => {
+      websocketService.off(Commands.GET_EP_LIST, handleEpListResponse);
+    };
+  }, [handleEpListResponse]);
+
   // 处理EP选择
   const handleEpisodeSelect = React.useCallback((episodeNumber: number) => {
     console.log(`EP${episodeNumber} selected, loading data from server...`);
@@ -926,7 +1112,6 @@ const Scene: React.FC = () => {
       console.log(`📤 Loading data for EP${episodeNumber} from server...`);
       
       // 发送请求时可以添加EP参数，如果后端支持的话
-      // 这里先发送标准请求，然后在客户端过滤
       websocketService.send(Commands.GET_SCENE_FEED, { 
         roomId: Number(effectiveSceneId), 
         page: 0, 
@@ -974,6 +1159,10 @@ const Scene: React.FC = () => {
       setPostsLoading(true);
       setVotesLoading(true);
       
+      // 重置EP相关状态，让handleEpListResponse自动选择最新的EP
+      setSelectedEpisode(null);
+      setEpListLoading(true);
+      
       // 更新URL参数以反映新的场景
       navigate(`/scene?sceneId=${newRoomId}`);
       
@@ -982,30 +1171,9 @@ const Scene: React.FC = () => {
       
       // 确保WebSocket连接已建立
       if (websocketService.isConnectionOpen()) {
-        // 按顺序发送三个请求
-        console.log('📤 [1/3] 发送新场景推文数据请求...');
-        websocketService.send(Commands.GET_SCENE_FEED, { 
-          roomId: Number(newRoomId), 
-          page: 0, 
-          size: 10 
-        });
-        
-        // 延迟发送第二个请求
-        setTimeout(() => {
-          console.log('📤 [2/3] 发送新场景投票历史请求...');
-          websocketService.getVoteHistory(Number(newRoomId));
-          
-          // 延迟发送第三个请求
-          setTimeout(() => {
-            console.log('📤 [3/3] 发送新场景角色历史请求...');
-            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-              roomId: Number(newRoomId)
-            });
-            
-            console.log('✅ NPC切换：所有三个请求已按顺序发送完成');
-          }, 500); // 第三个请求延迟500ms
-          
-        }, 500); // 第二个请求延迟500ms
+        // 只发送EP列表请求，其他请求会在EP列表处理后自动发送
+        console.log('📤 发送EP列表请求...');
+        websocketService.getEpList();
         
         // 给WebSocket响应一些时间
         setTimeout(() => {
@@ -1013,40 +1181,21 @@ const Scene: React.FC = () => {
           setNpcSwitchLoading(false);
           // 如果在超时后仍然没有数据，停止loading状态
           setTimeout(() => {
-            setPostsLoading(false);
-            setVotesLoading(false);
-          }, 5000); // 额外5秒等待数据
-        }, 1500);
+            setEpListLoading(false);
+          }, 10000); // 额外10秒等待数据
+        }, 2000);
       } else {
         console.warn("WebSocket connection not established, waiting for connection...");
         setTimeout(() => {
           if (websocketService.isConnectionOpen()) {
-            // 连接建立后也按顺序发送
-            console.log('📤 [1/3] 连接恢复后发送推文数据请求...');
-            websocketService.send(Commands.GET_SCENE_FEED, { 
-              roomId: Number(newRoomId), 
-              page: 0, 
-              size: 10 
-            });
-            
-            setTimeout(() => {
-              console.log('📤 [2/3] 连接恢复后发送投票历史请求...');
-              websocketService.getVoteHistory(Number(newRoomId));
-              
-              setTimeout(() => {
-                console.log('📤 [3/3] 连接恢复后发送角色历史请求...');
-                websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-                  roomId: Number(newRoomId)
-                });
-              }, 500);
-              
-            }, 500);
+            // 连接建立后也只发送EP列表请求
+            console.log('📤 连接恢复后发送EP列表请求...');
+            websocketService.getEpList();
           }
           setLoading(false);
           setNpcSwitchLoading(false);
           // 重置loading状态
-          setPostsLoading(false);
-          setVotesLoading(false);
+          setEpListLoading(false);
         }, 2000);
       }
       
@@ -1059,7 +1208,7 @@ const Scene: React.FC = () => {
         description: `Switching to ${newRoomId === '3' ? 'Idol Scene' : 'Ranch Scene'}...`
       });
     }
-  }, [effectiveSceneId, navigate, setAiPosts, setVoteHistory, setCharacterHistory, setLoading, setPostsLoading, setVotesLoading, setNpcSwitchLoading, navigateToScene]);
+  }, [effectiveSceneId, navigate, setAiPosts, setVoteHistory, setCharacterHistory, setLoading, setPostsLoading, setVotesLoading, setNpcSwitchLoading, setSelectedEpisode, setEpListLoading, navigateToScene]);
 
   // 渲染内容
   return (
@@ -1145,23 +1294,35 @@ const Scene: React.FC = () => {
                 >
                   <div className="h-32 overflow-y-auto p-4">
                     <div className="grid grid-cols-5 gap-3">
-                      {Array.from({ length: 15 }, (_, index) => {
-                        const episodeNumber = 15 - index; // 从EP15开始倒序
-                        const isSelected = selectedEpisode === episodeNumber;
-                        return (
-                          <button
-                            key={episodeNumber}
-                            className={`font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm ${
-                              isSelected
-                                ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                            }`}
-                            onClick={() => handleEpisodeSelect(episodeNumber)}
-                          >
-                            EP{episodeNumber}
-                          </button>
-                        );
-                      })}
+                      {epListLoading ? (
+                        <div className="col-span-5 flex items-center justify-center">
+                          <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mr-2"></div>
+                          <span className="text-sm text-gray-500">加载EP列表中...</span>
+                        </div>
+                      ) : getCurrentSceneEpList.length > 0 ? (
+                        getCurrentSceneEpList.map((ep) => {
+                          // 从EP1中提取数字部分
+                          const episodeNumber = parseInt(ep.replace('EP', ''));
+                          const isSelected = selectedEpisode === episodeNumber;
+                          return (
+                            <button
+                              key={ep}
+                              className={`font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm ${
+                                isSelected
+                                  ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                              }`}
+                              onClick={() => handleEpisodeSelect(episodeNumber)}
+                            >
+                              {ep}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="col-span-5 text-center text-sm text-gray-500">
+                          当前场景没有可用的EP列表
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

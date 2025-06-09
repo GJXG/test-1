@@ -27,7 +27,8 @@ const VoteHistoryPanel: React.FC<VoteHistoryPanelProps> = ({
       content: v.content, 
       userChoice: v.userChoice,
       hasVoted: v.hasVoted,
-      options: v.options
+      options: v.options,
+      imgUrl: v.imgUrl
     }))
   });
 
@@ -68,21 +69,37 @@ const VoteHistoryPanel: React.FC<VoteHistoryPanelProps> = ({
     return ['YES', 'NO'];
   };
 
-  // 按时间戳倒序排序投票历史（最新的在最上面）
+  // 按EP编号倒序排序投票历史（EP15-6在最上方，EP15-5在下方）
   const sortedVoteHistory = React.useMemo(() => {
     return [...voteHistory].sort((a, b) => {
-      // 将时间戳转换为Date对象进行比较
-      const dateA = new Date(a.timestamp).getTime();
-      const dateB = new Date(b.timestamp).getTime();
-      // 倒序排序：最新的时间在前面
-      return dateB - dateA;
+      // 从imgUrl中提取EP编号
+      const getEpNumber = (vote: VoteHistory) => {
+        if (!vote.imgUrl) return -1; // 如果没有imgUrl，排在最后
+        
+        const match = vote.imgUrl.match(/EP(\d+)-(\d+)/);
+        if (!match) return -1; // 如果没有匹配到EP格式，排在最后
+        
+        // 提取主要EP号和次要EP号
+        const majorEp = parseInt(match[1]);
+        const minorEp = parseInt(match[2]);
+        
+        // 返回一个可比较的数值（主要EP号 * 1000 + 次要EP号）
+        return majorEp * 1000 + minorEp;
+      };
+      
+      const aEpNumber = getEpNumber(a);
+      const bEpNumber = getEpNumber(b);
+      
+      // 倒序排列（大的EP号在前）
+      return bEpNumber - aEpNumber;
     });
   }, [voteHistory]);
 
   console.log('🗳️ Sorted vote history:', sortedVoteHistory.map(v => ({ 
     content: v.content, 
     timestamp: v.timestamp,
-    requestId: v.requestId 
+    requestId: v.requestId,
+    imgUrl: v.imgUrl
   })));
 
   return (
@@ -106,7 +123,7 @@ const VoteHistoryPanel: React.FC<VoteHistoryPanelProps> = ({
                 "text-center text-sm leading-[0.85]",
                 selectedOption ? "text-[#8B5E34]" : "text-[#E3B341]"
               )}>
-                {vote.content}
+                {vote.content}<br></br> {vote.imgUrl && <span>{vote.imgUrl}</span>}
               </p>
             </div>
 

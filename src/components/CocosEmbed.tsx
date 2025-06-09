@@ -22,21 +22,40 @@ export const iframeRef = React.createRef<HTMLIFrameElement>();
 let isGlobalInitialized = false;
 let globalSetShowIframe: ((show: boolean) => void) | null = null;
 let globalSetPosition: ((position: 'hidden' | 'container') => void) | null = null;
+let globalSetIsMuted: ((muted: boolean) => void) | null = null;
+let globalToggleMute: (() => void) | null = null;
 
 // 全局方法，用于发送消息到 iframe
 const sendMessageToIframe = (message: any) => {
-  if (iframeRef.current?.contentWindow) {
-    iframeRef.current.contentWindow.postMessage(message, '*');
-    console.log('React: 发送数据到游戏iframe ->', message);
-  } else {
-    console.error('React: iframe contentWindow 未找到');
+  try {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(message, '*');
+      console.log('React: 发送数据到游戏iframe ->', message);
+    } else {
+      console.error('React: iframe contentWindow 未找到');
+    }
+  } catch (error) {
+    console.error('发送消息到iframe失败:', error);
   }
 };
 
 export const useCocos = () => {
   const context = useContext(CocosContext);
   if (!context) {
-    throw new Error('useCocos must be used within a CocosProvider');
+    console.error('useCocos必须在CocosProvider内部使用');
+    // 返回一个空对象，避免直接抛出错误导致应用崩溃
+    return {
+      sendMessageToGame: () => {},
+      isConnected: false,
+      lastMessage: '',
+      messageLog: [],
+      showIframe: false,
+      setShowIframe: () => {},
+      navigateToScene: () => {},
+      isMuted: false,
+      toggleMute: () => {},
+      sendUserEmail: () => {}
+    } as CocosContextType;
   }
   return context;
 };
@@ -48,6 +67,22 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [messageLog, setMessageLog] = useState<string[]>([]);
   const [showIframe, setShowIframe] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+
+  // 初始化时从localStorage读取静音状态
+  useEffect(() => {
+    try {
+      const storedMuteState = localStorage.getItem('isMuted');
+      if (storedMuteState) {
+        const isMuted = storedMuteState === 'true';
+        setIsMuted(isMuted);
+        if (globalSetIsMuted) {
+          globalSetIsMuted(isMuted);
+        }
+      }
+    } catch (error) {
+      console.error('读取静音状态失败:', error);
+    }
+  }, []);
 
   const sendMessageToGame = (message: any) => {
     sendMessageToIframe(message);
@@ -70,15 +105,36 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "toggleMute",
-        isMuted: !isMuted
+    try {
+      const newMutedState = !isMuted;
+      setIsMuted(newMutedState);
+      sendMessageToGame({
+        type: "SEND_CUSTOM_EVENT",
+        data: {
+          action: "toggleMute",
+          isMuted: newMutedState
+        }
+      });
+      
+      // 保存静音状态到localStorage
+      localStorage.setItem('isMuted', String(newMutedState));
+      
+      // 同步GlobalIframe的静音状态
+      if (globalSetIsMuted) {
+        globalSetIsMuted(newMutedState);
       }
-    });
+    } catch (error) {
+      console.error('切换静音状态失败:', error);
+    }
   };
+
+  // 设置全局toggleMute函数
+  useEffect(() => {
+    globalToggleMute = toggleMute;
+    return () => {
+      globalToggleMute = null;
+    };
+  }, [isMuted]);
 
   const navigateToScene = (target: string) => {
     sendMessageToGame({
@@ -176,13 +232,58 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const GlobalIframe: React.FC = () => {
   const [showIframe, setShowIframe] = useState(false);
   const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
+  const [isMuted, setIsMuted] = useState(false);
+  const cocosContext = useCocos();
+  
+  // 初始化时从localStorage读取静音状态
+  useEffect(() => {
+    try {
+      const storedMuteState = localStorage.getItem('isMuted');
+      if (storedMuteState) {
+        setIsMuted(storedMuteState === 'true');
+      }
+    } catch (error) {
+      console.error('读取静音状态失败:', error);
+    }
+  }, []);
+  
+  const toggleMute = () => {
+    try {
+      // 如果有全局toggleMute函数，优先使用它来保持状态同步
+      if (globalToggleMute) {
+        globalToggleMute();
+        return;
+      }
+      
+      // 如果没有全局函数，则自行处理
+      const newMutedState = !isMuted;
+      setIsMuted(newMutedState);
+      
+      if (cocosContext) {
+        cocosContext.sendMessageToGame({
+          type: "SEND_CUSTOM_EVENT",
+          data: {
+            action: "toggleMute",
+            isMuted: newMutedState
+          }
+        });
+      }
+      
+      // 保存静音状态到localStorage
+      localStorage.setItem('isMuted', String(newMutedState));
+    } catch (error) {
+      console.error('切换静音状态失败:', error);
+    }
+  };
   
   useEffect(() => {
     globalSetShowIframe = setShowIframe;
     globalSetPosition = setPosition;
+    globalSetIsMuted = setIsMuted;
     return () => {
       globalSetShowIframe = null;
       globalSetPosition = null;
+      globalSetIsMuted = null;
     };
   }, []);
   
@@ -209,6 +310,30 @@ export const GlobalIframe: React.FC = () => {
         loading="lazy"
         title={position === 'hidden' ? "Game Embed Preloader" : "Game Embed"}
       />
+      
+      {/* 静音按钮 - 已隐藏但保留功能代码 */}
+      {/* {showIframe && position === 'container' && (
+        <button
+          onClick={toggleMute}
+          className="fixed top-3 left-3 w-10 h-10 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full transition-all duration-200 z-[1001] backdrop-blur-sm"
+        >
+          {isMuted ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+              <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+              <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
+          )}
+        </button>
+      )} */}
     </>
   );
 };
@@ -228,6 +353,18 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
   
   // 容器ref，用于iframe定位
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // 初始化时从localStorage读取静音状态
+  useEffect(() => {
+    try {
+      const storedMuteState = localStorage.getItem('isMuted');
+      if (storedMuteState) {
+        setIsMuted(storedMuteState === 'true');
+      }
+    } catch (error) {
+      console.error('读取静音状态失败:', error);
+    }
+  }, []);
 
   const sendMessageToGame = (message: any) => {
     sendMessageToIframe(message);
@@ -250,14 +387,27 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "toggleMute",
-        isMuted: !isMuted
+    try {
+      const newMutedState = !isMuted;
+      setIsMuted(newMutedState);
+      sendMessageToGame({
+        type: "SEND_CUSTOM_EVENT",
+        data: {
+          action: "toggleMute",
+          isMuted: newMutedState
+        }
+      });
+      
+      // 保存静音状态到localStorage
+      localStorage.setItem('isMuted', String(newMutedState));
+      
+      // 同步GlobalIframe的静音状态
+      if (globalSetIsMuted) {
+        globalSetIsMuted(newMutedState);
       }
-    });
+    } catch (error) {
+      console.error('切换静音状态失败:', error);
+    }
   };
 
   // 添加导航函数
@@ -443,6 +593,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
                 <line x1="12" y1="19" x2="12" y2="23"></line>
                 <line x1="8" y1="23" x2="16" y2="23"></line>
               </svg>
+              
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>

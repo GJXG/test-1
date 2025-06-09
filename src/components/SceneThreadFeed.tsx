@@ -553,7 +553,71 @@ const timeAgo = (timestamp: number) => {
   const postsList = React.useMemo(() => {
     console.log(`🖥️ [SceneThreadFeed] 渲染postsList - 数据长度: ${posts.length}`);
     
-    const result = posts.map(post => (
+    // 记录排序前的时间信息
+    if (posts.length > 0) {
+      const firstPost = posts[0];
+      const lastPost = posts[posts.length - 1];
+      console.log(`🔄 [SceneThreadFeed] 排序前 - 第一条: ID=${firstPost.id}, 媒体=${firstPost.imgUrl || firstPost.videoUrl}`);
+      console.log(`🔄 [SceneThreadFeed] 排序前 - 最后一条: ID=${lastPost.id}, 媒体=${lastPost.imgUrl || lastPost.videoUrl}`);
+    }
+    
+    // 提取媒体信息的函数
+    const getMediaInfo = (post: AIPost): { epNumber: number, sequence: number } => {
+      // 默认值
+      const defaultInfo = { epNumber: 9999, sequence: 9999 };
+      
+      // 检查函数，从URL中提取EP编号和序列号
+      const extractInfo = (url: string | undefined): { epNumber: number, sequence: number } | null => {
+        if (!url) return null;
+        
+        // 尝试匹配 EP数字-数字 格式
+        const match = url.match(/EP(\d+)-(\d+)\.(png|jpg|jpeg|mp4|avi|mov)/i);
+        if (match) {
+          return {
+            epNumber: parseInt(match[1]),  // EP编号
+            sequence: parseInt(match[2])   // 序列号
+          };
+        }
+        return null;
+      };
+      
+      // 优先从图片URL提取
+      const imgInfo = extractInfo(post.imgUrl);
+      if (imgInfo) return imgInfo;
+      
+      // 如果图片URL没有提取到，尝试从视频URL提取
+      const videoInfo = extractInfo(post.videoUrl);
+      if (videoInfo) return videoInfo;
+      
+      // 都没提取到，返回默认值
+      return defaultInfo;
+    };
+    
+    // 按照EP编号和序列号排序
+    const sortedPosts = [...posts].sort((a, b) => {
+      const infoA = getMediaInfo(a);
+      const infoB = getMediaInfo(b);
+      
+      // 首先按EP编号排序
+      if (infoA.epNumber !== infoB.epNumber) {
+        return infoA.epNumber - infoB.epNumber;
+      }
+      
+      // 如果EP编号相同，按序列号排序
+      return infoA.sequence - infoB.sequence;
+    });
+    
+    // 记录排序后的信息
+    if (sortedPosts.length > 0) {
+      console.log(`🔄 [SceneThreadFeed] 排序后顺序:`);
+      sortedPosts.forEach((post, index) => {
+        const mediaUrl = post.imgUrl || post.videoUrl || 'no-media';
+        const info = getMediaInfo(post);
+        console.log(`   ${index+1}. ID=${post.id}, EP=${info.epNumber}, 序号=${info.sequence}, 媒体=${mediaUrl}`);
+      });
+    }
+    
+    const result = sortedPosts.map(post => (
       <div
         key={post.id}
         className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 transition hover:shadow-md"
