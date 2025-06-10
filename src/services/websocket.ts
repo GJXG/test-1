@@ -25,6 +25,8 @@ export const Commands = {
   GET_CHARACTER_HISTORY: 10114,  // 获取角色历史聊天记录
   OPERATE_TWEET: 10113,   // 操作推文(点赞、评论等)
   HEARTBEAT: 10001,       // 心跳包命令
+  GET_EP_LIST: 10109,     // 获取EP列表
+  GET_USER_POINTS: 100081, // 获取用户积分
 };
 
 // 心跳配置
@@ -155,6 +157,9 @@ class WebSocketService {
         console.log(`WebSocket connected to ${CURRENT_ENV} server`);
         this.reconnectAttempts = 0;
         this.startHeartbeat(); // 启动心跳机制
+        
+        // 触发WebSocket连接事件
+        window.dispatchEvent(new CustomEvent('websocket-connected'));
         
         // 检查是否已有登录信息，如果有则自动登录
         const storedUserInfo = localStorage.getItem('userInfo');
@@ -690,9 +695,14 @@ class WebSocketService {
     this.login(loginData);
   }
 
-  getSceneFeed(roomId: number = 0, page: number = 0, size: number = 10) {
-    console.log(`获取场景推文，房间ID: ${roomId}, 页码: ${page}, 每页数量: ${size}`);
-    this.send(Commands.GET_SCENE_FEED, { roomId , page, size });
+  getSceneFeed(roomId: number = 0, page: number = 0, size: number = 30, episode?: number) {
+    console.log(`获取场景推文，房间ID: ${roomId}, 页码: ${page}, 每页数量: ${size}${episode ? `, EP: ${episode}` : ''}`);
+    // 构建请求参数，如果提供了episode就包含它
+    const requestData: any = { roomId, page, size };
+    if (episode !== undefined) {
+      requestData.episode = episode;
+    }
+    this.send(Commands.GET_SCENE_FEED, requestData);
   }
 
   operateTweet(tweetId: number, type: number, content: string, replyId: number, chooseIndex: number, rateList?: number[]) {
@@ -820,6 +830,9 @@ class WebSocketService {
       localStorage.setItem('token', loginData.token);
       localStorage.setItem('playerId', loginData.player.playerId);
       
+      // 触发用户登录事件
+      window.dispatchEvent(new CustomEvent('user-logged-in'));
+      
       // 更新用户信息中的地址
       // 根据实际响应，address可能在data顶层
       if (loginData.address) {
@@ -893,6 +906,18 @@ class WebSocketService {
     });
 
     console.log('🔄 Completed reconnect retry, remaining queue length:', this.pendingRequests.length);
+  }
+
+  // 添加获取EP列表的方法
+  getEpList() {
+    console.log('📤 Requesting EP list...');
+    return this.send(Commands.GET_EP_LIST, {});
+  }
+
+  // 获取用户积分
+  getUserPoints() {
+    console.log('💰 Requesting user points...');
+    return this.send(Commands.GET_USER_POINTS, {});
   }
 }
 

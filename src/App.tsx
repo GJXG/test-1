@@ -86,8 +86,8 @@ const App: React.FC = () => {
             </TooltipProvider>
           </QueryClientProvider>
         </GoogleOAuthProvider>
+        <GlobalIframe/>
       </CocosProvider>
-      <GlobalIframe />
     </>
   );
 };
