@@ -11,7 +11,7 @@ const SocialMediaIcons: React.FC<SocialMediaIconsProps> = ({ className }) => {
     { name: 'Instagram', icon: '/icons/instagram.svg', url: 'https://instagram.com/dramai' },
     { name: 'Twitter', icon: '/icons/twitter.svg', url: 'https://twitter.com/dramai' },
     { name: 'TikTok', icon: '/icons/tiktok.svg', url: 'https://tiktok.com/@dramai' },
-    { name: 'YouTube', icon: '/icons/youtube.svg', url: 'https://youtube.com/@dramai' },
+    { name: 'Reddit', icon: '/icons/reddit.svg', url: 'https://reddit.com/r/dramai' },
   ];
 
   return (
