@@ -4,7 +4,6 @@ import { Loader2, LogOut, ChevronDown, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import GoogleLoginButton from './GoogleLoginButton';
 import AppleLoginButton from './AppleLoginButton';
-import AuthError from './AuthError';
 import useUserPoints from '@/hooks/useUserPoints';
 
 interface UserInfo {
@@ -36,7 +35,6 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
   const [avatarError, setAvatarError] = React.useState(false);
   const [avatarLoading, setAvatarLoading] = React.useState(true);
   
@@ -67,7 +65,6 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
 
   const handleGoogleLoginSuccess = (userInfo: UserInfo) => {
     setLoading(false);
-    setError(null);
     onLogin?.(userInfo);
     // 登录成功后触发用户登录事件，以便更新积分
     setTimeout(() => {
@@ -78,7 +75,6 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
   const handleGoogleLoginError = (error: any) => {
     setLoading(false);
     console.error('Google login failed:', error);
-    setError(error.error_description || 'Login failed, please try again later');
   };
 
   const handleLogout = () => {
@@ -86,10 +82,6 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
     localStorage.removeItem('isSignedIn');
     navigate('/home');
     onLogout?.();
-  };
-
-  const handleRetry = () => {
-    setError(null);
   };
 
   const toggleFold = () => {
@@ -233,22 +225,16 @@ const UserInfoPanel: React.FC<UserInfoPanelProps> = ({
             </div>
           </div>
         ) : (
-          <>
-            {error ? (
-              <AuthError error={error} onRetry={handleRetry} />
-            ) : (
-              <div className="space-y-3">
-                <GoogleLoginButton
-                  onSuccess={handleGoogleLoginSuccess}
-                  onError={handleGoogleLoginError}
-                />
-                <AppleLoginButton
-                  onSuccess={handleGoogleLoginSuccess}
-                  onError={handleGoogleLoginError}
-                />
-              </div>
-            )}
-          </>
+          <div className="space-y-3">
+            <GoogleLoginButton
+              onSuccess={handleGoogleLoginSuccess}
+              onError={handleGoogleLoginError}
+            />
+            <AppleLoginButton
+              onSuccess={handleGoogleLoginSuccess}
+              onError={handleGoogleLoginError}
+            />
+          </div>
         )}
       </div>
     </div>
