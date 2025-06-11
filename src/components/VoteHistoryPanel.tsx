@@ -113,17 +113,26 @@ const VoteHistoryPanel: React.FC<VoteHistoryPanelProps> = ({
         return (
           <React.Fragment key={`${vote.requestId}-${index}`}>
             {/* Question Box */}
+              <p className={cn(
+                "text-center text-sm leading-[0.85]",
+                selectedOption ? "text-[#8B5E34]" : "text-[#E3B341]"
+              )}>
+                {vote.imgUrl && <span>{vote.imgUrl}</span>}
+              </p>
             <div
               className={cn(
                 "w-full max-w-2xl rounded-lg border-2 border-[#E3B341] px-4 py-2",
                 selectedOption ? "bg-[#E3B341]" : "bg-transparent"
               )}
             >
+              
               <p className={cn(
                 "text-center text-sm leading-[0.85]",
                 selectedOption ? "text-[#8B5E34]" : "text-[#E3B341]"
               )}>
-                {vote.content}<br></br> {vote.imgUrl && <span>{vote.imgUrl}</span>}
+                {/* {vote.imgUrl && <span>{vote.imgUrl}</span>} */}
+                {/* <br></br> */}
+                {vote.content}
               </p>
             </div>
 

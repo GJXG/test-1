@@ -697,12 +697,30 @@ class WebSocketService {
 
   getSceneFeed(roomId: number = 0, page: number = 0, size: number = 30, episode?: number) {
     console.log(`获取场景推文，房间ID: ${roomId}, 页码: ${page}, 每页数量: ${size}${episode ? `, EP: ${episode}` : ''}`);
+    
     // 构建请求参数，如果提供了episode就包含它
     const requestData: any = { roomId, page, size };
     if (episode !== undefined) {
-      requestData.episode = episode;
+      requestData.epId = `EP${episode}`; // 修改为epId格式
     }
-    this.send(Commands.GET_SCENE_FEED, requestData);
+    
+    // 构建完整的请求消息
+    const message = {
+      requestId: Date.now(), // 使用当前时间戳作为requestId
+      type: 1,
+      command: Commands.GET_SCENE_FEED,
+      data: requestData
+    };
+    
+    const jsonMessage = JSON.stringify(message);
+    console.log('📡 发送获取场景推文请求:', jsonMessage);
+    
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(jsonMessage);
+    } else {
+      console.error('❌ WebSocket连接未就绪，无法发送获取场景推文请求');
+      this.pendingRequests.push({ command: Commands.GET_SCENE_FEED, data: requestData });
+    }
   }
 
   operateTweet(tweetId: number, type: number, content: string, replyId: number, chooseIndex: number, rateList?: number[]) {
