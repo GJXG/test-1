@@ -12,7 +12,7 @@ const Mobile: React.FC = () => {
         <img
           src="/images/header-bg.png"
           alt="DraMai Header"
-          className="w-full h-full object-cover scale-110"
+          className="w-auto h-auto object-full scale-[2.4]"
         />
         <div className="absolute top-6 right-6">
           <img
@@ -21,11 +21,11 @@ const Mobile: React.FC = () => {
             className="h-6 w-auto animate-pulse"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
+        <div className="absolute inset-x-0 bottom-[170px] h-1/2 bg-gradient-to-b from-transparent via-background/10 to-background" />
       </header>
 
       {/* Logo and Beta at bottom of header */}
-      <div className="absolute top-[210px] left-[55%] -translate-x-1/2 -translate-y-1/2 flex items-center z-20">
+      <div className="absolute top-[200px] left-[55%] -translate-x-1/2 -translate-y-1/2 flex items-center z-20">
         <img 
           src="/logo.png" 
           alt="DraMai Logo" 
@@ -45,7 +45,7 @@ const Mobile: React.FC = () => {
           />
           <span className="text-gray-400 text-sm mt-2">coming soon...</span>
         </div>
-        <div className="w-24 h-[1px] bg-gray-300 my-4"></div>
+        <div className="w-24 h-[1px] bg-gray-300 my-1"></div>
         <div className="flex gap-4">
           <img src="/icons/discord.svg" alt="Discord" className="w-6 h-6" />
           <img src="/icons/instagram.svg" alt="Instagram" className="w-6 h-6" />
@@ -58,11 +58,12 @@ const Mobile: React.FC = () => {
       {/* Animations */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <DragonBonesAnimation
-          className="w-[100px] h-[120px] -mt-13"
+          className="w-[100px] h-[70px] -mt-11"
           skePath="/animations/pickflower/pickflower_ske.json"
           texJsonPath="/animations/pickflower/pickflower_tex.json"
           texPngPath="/animations/pickflower/pickflower_tex.png"
           animationName="pickflower"
+          scale={0.7}
         />
         <DragonBonesAnimation
           className="w-[600px] h-[1100px]"
@@ -70,6 +71,7 @@ const Mobile: React.FC = () => {
           texJsonPath="/animations/painting/painting_tex.json"
           texPngPath="/animations/painting/painting_tex.png"
           animationName="paint"
+          scale={0.7}
         />
       </div>
 
