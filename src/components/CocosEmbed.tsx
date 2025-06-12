@@ -109,10 +109,10 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const newMutedState = !isMuted;
       setIsMuted(newMutedState);
       sendMessageToGame({
-        type: "SEND_CUSTOM_EVENT",
+        type: "SET_AUDIO",
         data: {
-          action: "toggleMute",
-          isMuted: newMutedState
+          action: "setAudio",
+          audio: newMutedState ? "off" : "on"
         }
       });
       
@@ -261,10 +261,10 @@ export const GlobalIframe: React.FC = () => {
       
       if (cocosContext) {
         cocosContext.sendMessageToGame({
-          type: "SEND_CUSTOM_EVENT",
+          type: "SET_AUDIO",
           data: {
-            action: "toggleMute",
-            isMuted: newMutedState
+            action: "setAudio",
+            audio: newMutedState ? "off" : "on"
           }
         });
       }
@@ -391,10 +391,10 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
       const newMutedState = !isMuted;
       setIsMuted(newMutedState);
       sendMessageToGame({
-        type: "SEND_CUSTOM_EVENT",
+        type: "SET_AUDIO",
         data: {
-          action: "toggleMute",
-          isMuted: newMutedState
+          action: "setAudio",
+          audio: newMutedState ? "off" : "on"
         }
       });
       

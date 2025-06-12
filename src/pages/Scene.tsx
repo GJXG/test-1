@@ -247,6 +247,38 @@ const Scene: React.FC = () => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
+  // 添加一个ref来跟踪数据加载状态
+  const dataLoadedRef = React.useRef<{[key: string]: boolean}>({});
+  
+  // 添加一个请求跟踪对象，用于避免短时间内重复请求
+  const requestTrackerRef = React.useRef<{
+    [key: string]: {
+      timestamp: number;
+      requestId: string;
+    }
+  }>({});
+  
+  // 添加一个函数来检查并标记请求，避免重复
+  const shouldSendRequest = React.useCallback((command: number, roomId: number): boolean => {
+    const key = `${command}_${roomId}`;
+    const now = Date.now();
+    const lastRequest = requestTrackerRef.current[key];
+    
+    // 如果之前没有发送过请求，或者上次请求已经超过5秒，则允许发送
+    if (!lastRequest || now - lastRequest.timestamp > 5000) {
+      // 更新请求跟踪信息
+      requestTrackerRef.current[key] = {
+        timestamp: now,
+        requestId: `${now}_${Math.random().toString(36).substring(2, 9)}`
+      };
+      console.log(`⏱️ 允许发送请求: ${command}, 房间ID: ${roomId}, 请求ID: ${requestTrackerRef.current[key].requestId}`);
+      return true;
+    }
+    
+    console.log(`⏱️ 忽略重复请求: ${command}, 房间ID: ${roomId}, 距上次请求: ${now - lastRequest.timestamp}ms`);
+    return false;
+  }, []);
+
   // 处理事件处理器和事件依赖项
   const handleSceneFeed = React.useCallback((data: any) => {
     if (data && data.tweetVoList) {
@@ -410,8 +442,13 @@ const Scene: React.FC = () => {
       
       console.log('🗳️ Formatted vote history:', formattedVoteHistory);
       setVoteHistory(formattedVoteHistory);
-      setVotesLoading(false); // 投票数据加载完成
       console.log('🗳️ Updated voteHistory state with', formattedVoteHistory.length, 'votes for roomId:', effectiveSceneId);
+
+      // 标记该场景的数据已加载
+      if (effectiveSceneId) {
+        dataLoadedRef.current[effectiveSceneId] = true;
+        console.log('🗳️ 已标记场景ID的数据加载状态:', dataLoadedRef.current);
+      }
     } else {
       console.log('🗳️ No vote history data in event:', { 
         event, 
@@ -419,6 +456,8 @@ const Scene: React.FC = () => {
         hasVoteList: !!event?.data?.voteHistoryInfoList 
       });
     }
+
+    setVotesLoading(false); // 投票数据加载完成
   }, [effectiveSceneId]);
   
   const handleCharacterHistory = React.useCallback((event: any) => {
@@ -493,8 +532,15 @@ const Scene: React.FC = () => {
       
       setCharacterHistory(characters);
       console.log('Updated characterHistory with', characters.length, 'characters');
+
+      // 标记该场景的数据已加载（角色历史数据）
+      const currentRoomId = getEffectiveSceneId(searchParams.get('sceneId') || 'MainMenu');
+      if (currentRoomId) {
+        dataLoadedRef.current[currentRoomId] = true;
+        console.log('👤 已标记场景ID的角色历史数据加载状态:', dataLoadedRef.current);
+      }
     }
-  }, []);
+  }, [searchParams]);
 
   // 处理页面切换
   const handlePageChange = React.useCallback((newPage: number) => {
@@ -522,12 +568,12 @@ const Scene: React.FC = () => {
         const currentRequestPage = currentPageRef.current;
         console.log(`📤 发送请求使用页码: ${currentRequestPage}`);
         
-        websocketService.send(Commands.GET_SCENE_FEED, { 
-          roomId: Number(effectiveSceneId), 
-          page: currentRequestPage, // 使用ref中的最新值
-          size: 30,
-          episode: selectedEpisode // 添加EP参数（必须有值，由流程确保）
-        });
+        websocketService.getSceneFeed(
+          Number(effectiveSceneId),
+          currentRequestPage, // 使用ref中的最新值
+          30,
+          selectedEpisode // 添加EP参数（必须有值，由流程确保）
+        );
         
         // 设置超时检查，如果长时间没有收到数据，才会重置loading状态
         // 避免短时间内重置loading状态，让handleSceneFeed回调有机会处理
@@ -593,12 +639,12 @@ const Scene: React.FC = () => {
         // 延迟更长时间后刷新数据，确保服务器端数据已更新
         setTimeout(() => {
           console.log('💬 Sending GET_SCENE_FEED request to refresh data...');
-          websocketService.send(Commands.GET_SCENE_FEED, { 
-            roomId: Number(effectiveSceneId), 
-            page: currentPageRef.current, 
-            size: 30,
-            episode: selectedEpisode // 必须有选中的EP
-          });
+          websocketService.getSceneFeed(
+            Number(effectiveSceneId), 
+            currentPageRef.current, 
+            30,
+            selectedEpisode // 必须有选中的EP
+          );
           
           // 短暂延迟后重置加载状态
           setTimeout(() => {
@@ -640,127 +686,178 @@ const Scene: React.FC = () => {
   }, [handleSceneFeed, handleVoteHistory, handleCharacterHistory, handleOperateTweetResponse]);
 
   // 分离数据加载为单独的effect，避免事件处理器重新注册
+  // Hook 1: 只负责加载和【场景】相关的数据（投票、角色历史）
+  // 它只在场景ID (effectiveSceneId) 变化时运行
   useEffect(() => {
-    console.log('Loading scene data, sceneId:', sceneId, 'effectiveSceneId:', effectiveSceneId);
-    
-    // 如果有选择EP，则在场景数据加载时使用它；否则不发送推文请求，等待EP列表自动选择
-    if (selectedEpisode !== null) {
-      // 定义数据加载函数 - 按顺序发送请求
-      const loadSceneData = () => {
-        console.log(`Starting to fetch scene data sequentially, Scene ID: ${effectiveSceneId}, currentPage: ${currentPageRef.current}, selectedEP: ${selectedEpisode}`);
-        
-        // 加载场景数据
-        setLoading(true);
-        setPostsLoading(true); // 重置推文加载状态
-        setVotesLoading(true); // 重置投票加载状态
-        
-        // 第一个请求：获取场景推文数据
-        console.log('📤 [1/3] 发送推文数据请求...');
-        websocketService.send(Commands.GET_SCENE_FEED, { 
-          roomId: Number(effectiveSceneId), 
-          page: currentPageRef.current, 
-          size: 30, // 每页30条
-          episode: selectedEpisode // 添加EP参数
-        }, true); // 绕过登录检查
-        
-        // 延迟发送第二个请求：获取投票历史记录
-        setTimeout(() => {
-          console.log('📤 [2/3] 发送投票历史请求...');
-          websocketService.send(Commands.VOTE_THREAD, {
-            roomId: Number(effectiveSceneId)
-          }, true); // 绕过登录检查
-          
-          // 延迟发送第三个请求：获取角色历史
-          setTimeout(() => {
-            console.log('📤 [3/3] 发送角色历史请求...');
-            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-              roomId: Number(effectiveSceneId)
-            }, true); // 绕过登录检查
-            
-            console.log('✅ 所有三个请求已按顺序发送完成');
-          }, 500); // 第三个请求延迟500ms
-          
-        }, 500); // 第二个请求延迟500ms
-        
-        // 给WebSocket响应一些时间
-        setTimeout(() => {
-          setLoading(false);
-          // 如果在超时后仍然没有数据，停止loading状态
-          setTimeout(() => {
-            setPostsLoading(false);
-            setVotesLoading(false);
-          }, 5000); // 额外5秒等待数据
-        }, 1500);
-      };
-  
-      // 检查WebSocket连接状态（不检查登录状态）
-      if (websocketService.isConnectionOpen()) {
-        console.log('🚀 WebSocket连接已建立，立即加载数据（跳过登录检查）');
-        loadSceneData();
-      } else {
-        console.log('⏳ WebSocket未连接，等待连接建立...');
-        
-        // 使用定时器检查连接状态
-        const connectionCheckTimer = setInterval(() => {
-          if (websocketService.isConnectionOpen()) {
-            clearInterval(connectionCheckTimer);
-            console.log('✅ WebSocket连接已建立，开始加载场景数据');
-            loadSceneData();
-          }
-        }, 500); // 每500ms检查一次
-        
-        // 设置超时兜底机制
-        const timeoutTimer = setTimeout(() => {
-          clearInterval(connectionCheckTimer);
-          console.warn('⚠️ WebSocket连接超时，尝试强制加载数据');
-          loadSceneData(); // 即使没连接也尝试加载
-        }, 10000); // 10秒超时
-        
-        return () => {
-          clearInterval(connectionCheckTimer);
-          clearTimeout(timeoutTimer);
-        };
-      }
-    } else {
-      // 如果没有选择EP，只加载角色历史和投票历史，推文由EP列表自动选择处理
-      console.log('没有选择EP，等待EP列表自动选择后加载推文');
+    const loadSceneGenericData = () => {
+      console.log(`[场景数据加载] 场景ID: ${effectiveSceneId}`);
       
-      const loadNonTweetData = () => {
-        setLoading(true);
-        setVotesLoading(true); // 重置投票加载状态
+      // 重置该场景ID的数据加载状态
+      dataLoadedRef.current[effectiveSceneId] = false;
+      
+      setVotesLoading(true);
+      // 这里不再需要 setCharacterHistoryLoading
+
+      if (websocketService.isConnectionOpen()) {
+        // 检查用户是否已登录
+        const storedLoginStatus = localStorage.getItem('isSignedIn');
+        const userIsLoggedIn = storedLoginStatus === 'true';
         
-        if (websocketService.isConnectionOpen()) {
-          // 加载投票历史
-          console.log('📤 [1/2] 发送投票历史请求...');
-          websocketService.send(Commands.VOTE_THREAD, {
-            roomId: Number(effectiveSceneId)
-          }, true);
-          
-          // 加载角色历史
-          setTimeout(() => {
-            console.log('📤 [2/2] 发送角色历史请求...');
-            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+        if (userIsLoggedIn) {
+          // 使用请求跟踪函数检查是否应该发送请求
+          if (shouldSendRequest(Commands.VOTE_THREAD, Number(effectiveSceneId))) {
+            console.log('📤 [场景] 用户已登录，发送投票历史请求...');
+            websocketService.send(Commands.VOTE_THREAD, {
               roomId: Number(effectiveSceneId)
             }, true);
-          }, 500);
+          }
           
-          // 重置加载状态
           setTimeout(() => {
-            setLoading(false);
-            setTimeout(() => {
-              setVotesLoading(false);
-            }, 5000);
-          }, 1500);
+            if (shouldSendRequest(Commands.GET_CHARACTER_HISTORY, Number(effectiveSceneId))) {
+              console.log('📤 [场景] 发送角色历史请求...');
+              websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+                roomId: Number(effectiveSceneId)
+              }, true);
+            }
+          }, 200);
         } else {
-          // 连接未建立，设置超时保护
-          setLoading(false);
-          setVotesLoading(false);
+          console.log('📤 [场景] 用户未登录，等待登录后再请求投票历史数据');
+          // 不发送请求，等待登录成功事件触发后再请求
+          // 但设置超时，确保UI不会一直处于加载状态
         }
-      };
-      
-      loadNonTweetData();
+
+        // 标记该场景ID的数据已请求
+        dataLoadedRef.current[effectiveSceneId] = true;
+        
+        const loadingTimeout = setTimeout(() => {
+          // 在10秒后检查 votesLoading 状态
+          // 如果它依然为 true，说明我们没有收到回调
+          // 此时强制将其设置为 false
+          setVotesLoading(prev => {
+            if (prev) {
+              console.warn('⚠️ 投票历史加载超时，强制结束加载状态。');
+              return false;
+            }
+            return prev;
+          });
+        }, 10000);
+
+        // 返回一个清理函数，当组件卸载或useEffect重跑时，清除上一个定时器
+        return () => clearTimeout(loadingTimeout);
+
+      } else {
+        console.error('WebSocket未连接，无法加载场景通用数据');
+      }
+    };
+    
+    if (effectiveSceneId && effectiveSceneId !== 'MainMenu') {
+      loadSceneGenericData();
     }
-  }, [effectiveSceneId, selectedEpisode]);
+  }, [effectiveSceneId, shouldSendRequest]); // <-- 关键：只依赖 effectiveSceneId
+
+  // 添加新的Effect，监听WebSocket连接事件
+  useEffect(() => {
+    // 创建处理WebSocket连接事件的函数
+    const handleWebSocketConnected = () => {
+      console.log('🔄 WebSocket已连接，检查是否需要自动请求场景数据');
+      
+      if (effectiveSceneId && effectiveSceneId !== 'MainMenu') {
+        // 检查该场景的数据是否已经加载过
+        if (!dataLoadedRef.current[effectiveSceneId]) {
+          console.log('🔄 数据尚未加载，重新请求场景数据，房间ID:', effectiveSceneId);
+          setVotesLoading(true);
+          
+          // 使用requestSceneData方法前先检查是否应该发送请求
+          const roomId = Number(effectiveSceneId);
+          if (shouldSendRequest(Commands.VOTE_THREAD, roomId) || 
+              shouldSendRequest(Commands.GET_CHARACTER_HISTORY, roomId)) {
+            const requestId = requestTrackerRef.current[`${Commands.VOTE_THREAD}_${roomId}`]?.requestId;
+            websocketService.requestSceneData(roomId, requestId);
+          } else {
+            console.log('🔄 请求追踪器显示请求已在短时间内发送过，跳过重复请求');
+          }
+          
+          // 标记该场景ID的数据已请求
+          dataLoadedRef.current[effectiveSceneId] = true;
+          
+          // 设置超时保护，避免一直处于加载状态
+          const loadingTimeout = setTimeout(() => {
+            setVotesLoading(false);
+          }, 10000);
+          
+          return () => clearTimeout(loadingTimeout);
+        } else {
+          console.log('🔄 该场景数据已经加载过，跳过重复请求');
+        }
+      }
+    };
+    
+    // 注册事件监听
+    window.addEventListener('websocket-connected', handleWebSocketConnected);
+    
+    // 如果WebSocket已连接，检查是否需要直接请求场景数据
+    if (websocketService.isConnectionOpen() && effectiveSceneId && effectiveSceneId !== 'MainMenu') {
+      if (!dataLoadedRef.current[effectiveSceneId]) {
+        console.log('初始化时WebSocket已连接且数据未加载，立即请求场景数据');
+        
+        // 初始化也使用请求跟踪机制
+        const roomId = Number(effectiveSceneId);
+        if (shouldSendRequest(Commands.VOTE_THREAD, roomId) || 
+            shouldSendRequest(Commands.GET_CHARACTER_HISTORY, roomId)) {
+          const requestId = requestTrackerRef.current[`${Commands.VOTE_THREAD}_${roomId}`]?.requestId;
+          websocketService.requestSceneData(roomId, requestId);
+        } else {
+          console.log('初始化请求追踪器显示请求已在短时间内发送过，跳过重复请求');
+        }
+        
+        // 标记该场景ID的数据已请求
+        dataLoadedRef.current[effectiveSceneId] = true;
+      } else {
+        console.log('初始化时WebSocket已连接但数据已加载，跳过重复请求');
+      }
+    }
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('websocket-connected', handleWebSocketConnected);
+    };
+  }, [effectiveSceneId, shouldSendRequest]); // 添加shouldSendRequest作为依赖
+
+  // Hook 2: 只负责加载和【EP】相关的推文数据
+  // 它只在选中的EP (selectedEpisode) 变化时运行
+  useEffect(() => {
+    const loadEpisodePosts = () => {
+      console.log(`[EP数据加载] EP: ${selectedEpisode}, 场景ID: ${effectiveSceneId}`);
+      setPostsLoading(true);
+      setAiPosts([]); // 开始加载新EP时，清空旧推文
+      setCurrentPage(0);
+      currentPageRef.current = 0;
+
+      if (websocketService.isConnectionOpen()) {
+        console.log('📤 [EP] 发送推文数据请求...');
+        // 注意：这里可能需要根据你的 websocketService 实现来调用，
+        // 我使用了你代码中已有的 websocketService.getSceneFeed 示例
+        websocketService.getSceneFeed(
+          Number(effectiveSceneId), 
+          0, 
+          30,
+          selectedEpisode
+        );
+      } else {
+        console.error('WebSocket未连接，无法加载推文数据');
+        setPostsLoading(false);
+      }
+    };
+
+    if (effectiveSceneId && effectiveSceneId !== 'MainMenu' && selectedEpisode !== null) {
+      loadEpisodePosts();
+    }
+    
+    // 如果没有选中EP，确保推文列表不是加载状态
+    if (selectedEpisode === null) {
+      setPostsLoading(false);
+    }
+  }, [selectedEpisode, effectiveSceneId]); // <-- 关键：现在主要依赖 selectedEpisode
 
   // 删除重复的WebSocket监听器
   useEffect(() => {
@@ -1112,12 +1209,12 @@ const Scene: React.FC = () => {
       console.log(`📤 Loading data for EP${episodeNumber} from server...`);
       
       // 发送请求时可以添加EP参数，如果后端支持的话
-      websocketService.send(Commands.GET_SCENE_FEED, { 
-        roomId: Number(effectiveSceneId), 
-        page: 0, 
-        size: 50, // 增加数量以获取更多数据用于EP过滤
-        episode: episodeNumber // 如果后端支持EP过滤参数
-      });
+      websocketService.getSceneFeed(
+        Number(effectiveSceneId), 
+        0, 
+        50, // 增加数量以获取更多数据用于EP过滤
+        episodeNumber // 如果后端支持EP过滤参数
+      );
       
       // 设置超时保护
       setTimeout(() => {
@@ -1210,6 +1307,54 @@ const Scene: React.FC = () => {
     }
   }, [effectiveSceneId, navigate, setAiPosts, setVoteHistory, setCharacterHistory, setLoading, setPostsLoading, setVotesLoading, setNpcSwitchLoading, setSelectedEpisode, setEpListLoading, navigateToScene]);
 
+  // 添加新的Effect，监听用户登录事件
+  useEffect(() => {
+    // 创建处理用户登录事件的函数
+    const handleUserLoggedIn = () => {
+      console.log('👤 用户登录成功，检查是否需要请求投票历史数据');
+      if (effectiveSceneId && effectiveSceneId !== 'MainMenu') {
+        console.log('👤 用户登录后请求场景数据，房间ID:', effectiveSceneId);
+        setVotesLoading(true);
+        
+        const roomId = Number(effectiveSceneId);
+        
+        // 用户已登录，使用请求跟踪机制检查是否应该发送请求
+        if (shouldSendRequest(Commands.VOTE_THREAD, roomId)) {
+          websocketService.send(Commands.VOTE_THREAD, {
+            roomId: roomId
+          }, true);
+        } else {
+          console.log('👤 用户登录后检测到投票历史请求已在短时间内发送过，跳过');
+        }
+        
+        setTimeout(() => {
+          if (shouldSendRequest(Commands.GET_CHARACTER_HISTORY, roomId)) {
+            websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+              roomId: roomId
+            }, true);
+          } else {
+            console.log('👤 用户登录后检测到角色历史请求已在短时间内发送过，跳过');
+          }
+        }, 200);
+        
+        // 设置超时保护，避免一直处于加载状态
+        const loadingTimeout = setTimeout(() => {
+          setVotesLoading(false);
+        }, 10000);
+        
+        return () => clearTimeout(loadingTimeout);
+      }
+    };
+    
+    // 注册事件监听
+    window.addEventListener('user-logged-in', handleUserLoggedIn);
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('user-logged-in', handleUserLoggedIn);
+    };
+  }, [effectiveSceneId, shouldSendRequest]); // 添加shouldSendRequest作为依赖
+
   // 渲染内容
   return (
     <div className="h-screen flex overflow-hidden">
@@ -1237,14 +1382,6 @@ const Scene: React.FC = () => {
           onToggleCollapse={(collapsed) => setIsHeaderCollapsed(collapsed)}
         />
         
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading scene...</p>
-            </div>
-          </div>
-        ) : (
           <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
             {/* Game Embed Container - 维持486:864比例 */}
             <div 
@@ -1369,7 +1506,6 @@ const Scene: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
       </main>
     </div>
   );
