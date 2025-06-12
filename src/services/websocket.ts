@@ -572,8 +572,15 @@ class WebSocketService {
         }
       }
 
-      // 检查登录状态（可以被绕过）
-      if (command !== Commands.LOGIN && !this.isLoggedIn && !bypassLoginCheck) {
+      // 定义不需要登录的命令列表
+      const nonLoginRequiredCommands = [
+        Commands.HEARTBEAT,
+        Commands.GET_SCENE_FEED
+      ];
+
+      // 检查登录状态，如果命令不需要登录或者明确指定绕过登录检查，则直接发送
+      if (command !== Commands.LOGIN && !this.isLoggedIn && 
+          !bypassLoginCheck && !nonLoginRequiredCommands.includes(command)) {
         console.log('🔒 未登录，将请求添加到待处理队列:', {
           command,
           data,
@@ -596,7 +603,7 @@ class WebSocketService {
         message: jsonMessage,
         command: command,
         data: data,
-        bypassedLogin: bypassLoginCheck
+        bypassedLogin: bypassLoginCheck || nonLoginRequiredCommands.includes(command)
       });
       
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -867,12 +874,37 @@ class WebSocketService {
         }
       }
       
-      // 处理待发送的请求
-      const pendingCount = this.pendingRequests.length;
-      if (pendingCount > 0) {
-        console.log(`🔄 Login successful, retrying ${pendingCount} pending requests...`);
+      // 特殊处理：优先处理投票历史和聊天历史请求
+      const priorityCommands = [Commands.VOTE_THREAD, Commands.GET_CHARACTER_HISTORY];
+      
+      // 找出优先处理的请求
+      const priorityRequests = this.pendingRequests.filter(req => 
+        priorityCommands.includes(req.command)
+      );
+      
+      // 剩余的常规请求
+      const otherRequests = this.pendingRequests.filter(req => 
+        !priorityCommands.includes(req.command)
+      );
+      
+      // 优先处理投票历史和聊天历史请求
+      if (priorityRequests.length > 0) {
+        console.log(`🔄 登录成功，优先处理 ${priorityRequests.length} 个投票和聊天历史请求`);
+        priorityRequests.forEach(request => {
+          console.log('📤 处理优先请求:', request.command);
+          this.send(request.command, request.data, true);
+        });
       }
-      this.processPendingRequests();
+      
+      // 处理其他待发送的请求
+      const remainingCount = otherRequests.length;
+      if (remainingCount > 0) {
+        console.log(`🔄 登录成功，继续处理 ${remainingCount} 个常规请求`);
+        this.pendingRequests = otherRequests; // 更新队列为剩余请求
+        this.processPendingRequests(); // 处理剩余的请求
+      } else {
+        this.pendingRequests = []; // 清空队列
+      }
     } else {
       console.error('❌ Login failed:', response.message);
     }
@@ -908,22 +940,37 @@ class WebSocketService {
     // 定义不需要登录就可以重试的请求类型
     const nonLoginRequiredCommands = [
       Commands.HEARTBEAT,
-      // 可以根据需要添加其他不需要登录的命令
+      Commands.GET_SCENE_FEED        // 添加场景Feed命令
+      // 移除投票历史和聊天历史命令，确保它们必须在登录后才能发送
     ];
 
-    requestsToRetry.forEach((request, index) => {
+    // 首先找出登录请求，优先处理
+    const loginRequests = requestsToRetry.filter(req => req.command === Commands.LOGIN);
+    const otherRequests = requestsToRetry.filter(req => req.command !== Commands.LOGIN);
+
+    // 先处理登录请求
+    if (loginRequests.length > 0) {
+      console.log('🔄 找到登录请求，优先处理');
+      loginRequests.forEach(request => {
+        console.log('📤 重试登录请求');
+        this.send(request.command, request.data, true);
+      });
+    }
+
+    // 再处理其他请求
+    otherRequests.forEach((request, index) => {
       // 对于不需要登录的请求，立即重试
       if (nonLoginRequiredCommands.includes(request.command)) {
-        console.log(`📤 Retrying non-login request: ${request.command} (${index + 1}/${requestsToRetry.length})`);
+        console.log(`📤 重试不需要登录的请求: ${request.command} (${index + 1}/${otherRequests.length})`);
         this.send(request.command, request.data, true); // 绕过登录检查
       } else {
         // 对于需要登录的请求，重新加入队列等待登录成功后处理
-        console.log(`⏳ Re-queuing request that requires login: ${request.command}`);
+        console.log(`⏳ 重新加入需要登录的请求到队列: ${request.command}`);
         this.pendingRequests.push(request);
       }
     });
 
-    console.log('🔄 Completed reconnect retry, remaining queue length:', this.pendingRequests.length);
+    console.log('🔄 重连后请求处理完成，剩余队列长度:', this.pendingRequests.length);
   }
 
   // 添加获取EP列表的方法
@@ -936,6 +983,36 @@ class WebSocketService {
   getUserPoints() {
     console.log('💰 Requesting user points...');
     return this.send(Commands.GET_USER_POINTS, {});
+  }
+
+  // 新增：在WebSocket连接后请求当前场景数据
+  public requestSceneData(roomId: number, requestId?: string) {
+    if (!this.isConnectionOpen()) {
+      console.log('WebSocket未连接，将场景数据请求添加到待处理队列');
+      this.pendingRequests.push({ command: Commands.VOTE_THREAD, data: { roomId, requestId } });
+      this.pendingRequests.push({ command: Commands.GET_CHARACTER_HISTORY, data: { roomId, requestId } });
+      return;
+    }
+    
+    console.log('📤 [WebSocket重连] 请求场景数据，房间ID:', roomId, requestId ? `请求ID: ${requestId}` : '');
+    
+    // 检查是否已登录
+    if (this.isLoggedIn) {
+      console.log('👤 用户已登录，直接发送投票历史和角色历史请求');
+      // 已登录用户，直接发送请求
+      this.send(Commands.VOTE_THREAD, { roomId, requestId }, true);
+      
+      // 稍微延迟请求角色历史，避免请求过于密集
+      setTimeout(() => {
+        this.send(Commands.GET_CHARACTER_HISTORY, { roomId, requestId }, true);
+      }, 200);
+    } else {
+      console.log('👤 用户未登录，将投票历史和角色历史请求加入待处理队列');
+      // 未登录用户，将请求添加到待处理队列
+      // 这些请求将在用户登录成功后自动处理
+      this.pendingRequests.push({ command: Commands.VOTE_THREAD, data: { roomId, requestId } });
+      this.pendingRequests.push({ command: Commands.GET_CHARACTER_HISTORY, data: { roomId, requestId } });
+    }
   }
 }
 
