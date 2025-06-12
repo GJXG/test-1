@@ -612,22 +612,22 @@ const Scene: React.FC = () => {
       });
       
       // 根据操作类型显示不同的成功消息
-      let successMessage = "操作成功";
+      let successMessage = "Operation successful";
       switch (responseData?.type) {
         case 1:
-          successMessage = "点赞成功";
+          successMessage = "Like successful";
           break;
         case 2:
-          successMessage = `评论成功${responseData?.commentId ? ` (评论ID: ${responseData.commentId})` : ''}`;
+          successMessage = `Comment successful${responseData?.commentId ? ` (Comment ID: ${responseData.commentId})` : ''}`;
           break;
         case 3:
-          successMessage = "投票成功";
+          successMessage = "Vote successful";
           break;
       }
       
       toast({
         title: successMessage,
-        description: `操作已完成，数据同步中...`
+        description: `Operation completed, syncing data...`
       });
       
       console.log('💬 Refreshing feed data...');
@@ -659,8 +659,8 @@ const Scene: React.FC = () => {
         data: event?.data
       });
       toast({
-        title: "操作失败",
-        description: event?.message || "推文操作失败，请重试",
+        title: "Operation failed",
+        description: event?.message || "Tweet operation failed, please try again",
         variant: "destructive"
       });
     }
