@@ -615,22 +615,22 @@ const Scene: React.FC = () => {
       });
       
       // 根据操作类型显示不同的成功消息
-      let successMessage = "操作成功";
+      let successMessage = "Operation successful";
       switch (responseData?.type) {
         case 1:
-          successMessage = "点赞成功";
+          successMessage = "Like successful";
           break;
         case 2:
-          successMessage = `评论成功${responseData?.commentId ? ` (评论ID: ${responseData.commentId})` : ''}`;
+          successMessage = `Comment successful${responseData?.commentId ? ` (Comment ID: ${responseData.commentId})` : ''}`;
           break;
         case 3:
-          successMessage = "投票成功";
+          successMessage = "Vote successful";
           break;
       }
       
       toast({
         title: successMessage,
-        description: `操作已完成，数据同步中...`
+        description: `Operation completed, syncing data...`
       });
       
       console.log('💬 Refreshing feed data...');
@@ -662,13 +662,13 @@ const Scene: React.FC = () => {
         data: event?.data
       });
       toast({
-        title: "操作失败",
-        description: event?.message || "推文操作失败，请重试",
+        title: "Operation failed",
+        description: event?.message || "Tweet operation failed, please try again",
         variant: "destructive"
       });
     }
   }, [effectiveSceneId, selectedEpisode]);
-
+  
   // 初始化加载和设置WebSocket事件处理器
   useEffect(() => {
     console.log('Initializing WebSocket event handlers');
@@ -710,16 +710,16 @@ const Scene: React.FC = () => {
           // 使用请求跟踪函数检查是否应该发送请求
           if (shouldSendRequest(Commands.VOTE_THREAD, Number(effectiveSceneId))) {
             console.log('📤 [场景] 用户已登录，发送投票历史请求...');
-            websocketService.send(Commands.VOTE_THREAD, {
-              roomId: Number(effectiveSceneId)
+        websocketService.send(Commands.VOTE_THREAD, {
+          roomId: Number(effectiveSceneId)
             }, true);
           }
-          
-          setTimeout(() => {
+        
+        setTimeout(() => {
             if (shouldSendRequest(Commands.GET_CHARACTER_HISTORY, Number(effectiveSceneId))) {
               console.log('📤 [场景] 发送角色历史请求...');
-              websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-                roomId: Number(effectiveSceneId)
+          websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+            roomId: Number(effectiveSceneId)
               }, true);
             }
           }, 200);
@@ -776,7 +776,7 @@ const Scene: React.FC = () => {
               shouldSendRequest(Commands.GET_CHARACTER_HISTORY, roomId)) {
             const requestId = requestTrackerRef.current[`${Commands.VOTE_THREAD}_${roomId}`]?.requestId;
             websocketService.requestSceneData(roomId, requestId);
-          } else {
+    } else {
             console.log('🔄 请求追踪器显示请求已在短时间内发送过，跳过重复请求');
           }
           
@@ -821,7 +821,7 @@ const Scene: React.FC = () => {
     }
     
     // 清理函数
-    return () => {
+      return () => {
       window.removeEventListener('websocket-connected', handleWebSocketConnected);
     };
   }, [effectiveSceneId, shouldSendRequest]); // 添加shouldSendRequest作为依赖
@@ -1485,9 +1485,9 @@ const Scene: React.FC = () => {
                   currentSceneId={effectiveSceneId}
                   loading={votesLoading}
                 />
-                </div>
               </div>
             </div>
+          </div>
           </div>
       </main>
     </div>

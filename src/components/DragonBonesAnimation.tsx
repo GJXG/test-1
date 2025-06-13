@@ -11,6 +11,7 @@ interface DragonBonesAnimationProps {
   texJsonPath: string;
   texPngPath: string;
   animationName?: string;
+  scale?: number;
 }
 
 const DragonBonesAnimation: React.FC<DragonBonesAnimationProps> = ({ 
@@ -18,7 +19,8 @@ const DragonBonesAnimation: React.FC<DragonBonesAnimationProps> = ({
   skePath, 
   texJsonPath, 
   texPngPath,
-  animationName 
+  animationName,
+  scale = 1
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
@@ -87,7 +89,7 @@ const DragonBonesAnimation: React.FC<DragonBonesAnimationProps> = ({
               armatureDisplayRef.current = armatureDisplay;
               armatureDisplay.x = app.renderer.width / 2;
               armatureDisplay.y = app.renderer.height / 2;
-              armatureDisplay.scale.set(1);
+              armatureDisplay.scale.set(scale);
 
               // 获取可用的动画列表
               const animationList = armatureData && armatureData.length > 0 && armatureData[0].animation;
@@ -125,7 +127,7 @@ const DragonBonesAnimation: React.FC<DragonBonesAnimationProps> = ({
         delete PIXI.utils.TextureCache[texPngPath];
       }
     };
-  }, [skePath, texJsonPath, texPngPath, animationName]);
+  }, [skePath, texJsonPath, texPngPath, animationName, scale]);
 
   return <div ref={containerRef} className={className} />;
 };
