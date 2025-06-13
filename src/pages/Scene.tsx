@@ -282,8 +282,12 @@ const Scene: React.FC = () => {
   // 处理事件处理器和事件依赖项
   const handleSceneFeed = React.useCallback((data: any) => {
     if (data && data.tweetVoList) {
-      // 忽略第一条推文信息
-      const filteredTweets = data.tweetVoList.slice(1);
+      // 临时修改：不忽略第一条推文信息，使用完整数组
+      const filteredTweets = data.tweetVoList;
+      
+      // 原代码（暂时注释掉）
+      // // 忽略第一条推文信息
+      // const filteredTweets = data.tweetVoList.slice(1);
       
       console.log('🔍 Received scene feed data:', {
         roomId: data.roomId,
@@ -292,8 +296,7 @@ const Scene: React.FC = () => {
         totalTweetCount: data.tweetVoList.length,
         filteredTweetCount: filteredTweets.length,
         currentPage: currentPageRef.current, // 使用ref中的值
-        ignoredFirstTweet: data.tweetVoList.length > 0 ? data.tweetVoList[0].id : 'none',
-        firstUsedTweet: filteredTweets.length > 0 ? filteredTweets[0].id : 'none',
+        firstTweet: filteredTweets.length > 0 ? filteredTweets[0].id : 'none',
         lastTweetId: filteredTweets.length > 0 ? filteredTweets[filteredTweets.length - 1].id : 'none'
       });
       
@@ -301,8 +304,8 @@ const Scene: React.FC = () => {
       console.log('收到数据，立即设置 postsLoading = false');
       setPostsLoading(false);
       
-      // 详细日志：打印接收到的推文ID列表（已忽略第一条）
-      console.log('🔄 接收到的推文ID列表(已忽略第一条):', filteredTweets.map((t: any) => t.id).join(', '));
+      // 详细日志：打印接收到的推文ID列表
+      console.log('🔄 接收到的完整推文ID列表:', filteredTweets.map((t: any) => t.id).join(', '));
       
       // 对于初始加载或场景切换（页码为0）时，直接替换所有数据
       if (currentPageRef.current === 0) {
@@ -835,8 +838,7 @@ const Scene: React.FC = () => {
 
       if (websocketService.isConnectionOpen()) {
         console.log('📤 [EP] 发送推文数据请求...');
-        // 注意：这里可能需要根据你的 websocketService 实现来调用，
-        // 我使用了你代码中已有的 websocketService.getSceneFeed 示例
+        // 统一使用size=30
         websocketService.getSceneFeed(
           Number(effectiveSceneId), 
           0, 
@@ -1065,11 +1067,15 @@ const Scene: React.FC = () => {
 
   // 使用useMemo缓存过滤后的结果
   const filteredPosts = React.useMemo(() => {
-    // 首先按场景过滤
-    const sceneFilteredPosts = filterPostsByScene(aiPosts, effectiveSceneId);
-    // 然后按EP过滤
-    return filterPostsByEpisode(sceneFilteredPosts, selectedEpisode);
-  }, [aiPosts, effectiveSceneId, selectedEpisode]);
+    // 临时修改：直接返回所有推文，不做过滤
+    return aiPosts;
+    
+    // 原过滤代码（暂时注释掉）
+    // // 首先按场景过滤
+    // const sceneFilteredPosts = filterPostsByScene(aiPosts, effectiveSceneId);
+    // // 然后按EP过滤
+    // return filterPostsByEpisode(sceneFilteredPosts, selectedEpisode);
+  }, [aiPosts]); // 依赖项只保留 aiPosts
   
   const filteredVotes = React.useMemo(
     () => filterVotesByScene(voteHistory, effectiveSceneId),
@@ -1191,12 +1197,9 @@ const Scene: React.FC = () => {
   }, [handleEpListResponse]);
 
   // 处理EP选择
-  const handleEpisodeSelect = React.useCallback((episodeNumber: number) => {
-    console.log(`EP${episodeNumber} selected, loading data from server...`);
+  const handleSelectEpisode = React.useCallback((episodeNumber: number) => {
     setSelectedEpisode(episodeNumber);
-    setShowEpisodeList(false); // 选择后关闭列表
-    
-    // 清空当前数据，显示加载状态
+    setShowEpisodeList(false);
     setAiPosts([]);
     setPostsLoading(true);
     
@@ -1205,28 +1208,8 @@ const Scene: React.FC = () => {
     currentPageRef.current = 0;
     
     // 从服务器重新加载指定EP的数据
-    if (websocketService.isConnectionOpen()) {
-      console.log(`📤 Loading data for EP${episodeNumber} from server...`);
-      
-      // 发送请求时可以添加EP参数，如果后端支持的话
-      websocketService.getSceneFeed(
-        Number(effectiveSceneId), 
-        0, 
-        50, // 增加数量以获取更多数据用于EP过滤
-        episodeNumber // 如果后端支持EP过滤参数
-      );
-      
-      // 设置超时保护
-      setTimeout(() => {
-        if (postsLoading) {
-          console.log(`EP${episodeNumber} data loading timeout, resetting loading state`);
-          setPostsLoading(false);
-        }
-      }, 10000);
-    } else {
-      console.error('WebSocket connection not available');
-      setPostsLoading(false);
-    }
+    // 注意：这里不再发送请求，因为上面的useEffect会在selectedEpisode变化时自动触发请求
+    // 避免重复请求
     
     toast({
       title: "Loading Episode",
@@ -1434,7 +1417,7 @@ const Scene: React.FC = () => {
                       {epListLoading ? (
                         <div className="col-span-5 flex items-center justify-center">
                           <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mr-2"></div>
-                          <span className="text-sm text-gray-500">加载EP列表中...</span>
+                          <span className="text-sm text-gray-500">Loading EP list...</span>
                         </div>
                       ) : getCurrentSceneEpList.length > 0 ? (
                         getCurrentSceneEpList.map((ep) => {
@@ -1449,7 +1432,7 @@ const Scene: React.FC = () => {
                                   ? 'bg-blue-500 text-white hover:bg-blue-600'
                                   : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                               }`}
-                              onClick={() => handleEpisodeSelect(episodeNumber)}
+                              onClick={() => handleSelectEpisode(episodeNumber)}
                             >
                               {ep}
                             </button>
@@ -1457,7 +1440,7 @@ const Scene: React.FC = () => {
                         })
                       ) : (
                         <div className="col-span-5 text-center text-sm text-gray-500">
-                          当前场景没有可用的EP列表
+                          No episodes available for this scene
                         </div>
                       )}
                     </div>

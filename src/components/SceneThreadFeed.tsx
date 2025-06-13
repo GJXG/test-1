@@ -593,27 +593,30 @@ const timeAgo = (timestamp: number) => {
       return defaultInfo;
     };
     
-    // 按照EP编号和序列号排序
-    const sortedPosts = [...posts].sort((a, b) => {
-      const infoA = getMediaInfo(a);
-      const infoB = getMediaInfo(b);
-      
-      // 首先按EP编号排序
-      if (infoA.epNumber !== infoB.epNumber) {
-        return infoA.epNumber - infoB.epNumber;
-      }
-      
-      // 如果EP编号相同，按序列号排序
-      return infoA.sequence - infoB.sequence;
-    });
+    // 临时修改：不进行排序，直接使用原始数组
+    const sortedPosts = [...posts];
     
-    // 记录排序后的信息
+    // 原排序代码（暂时注释掉）
+    // // 按照EP编号和序列号排序
+    // const sortedPosts = [...posts].sort((a, b) => {
+    //   const infoA = getMediaInfo(a);
+    //   const infoB = getMediaInfo(b);
+    //   
+    //   // 首先按EP编号排序
+    //   if (infoA.epNumber !== infoB.epNumber) {
+    //     return infoA.epNumber - infoB.epNumber;
+    //   }
+    //   
+    //   // 如果EP编号相同，按序列号排序
+    //   return infoA.sequence - infoB.sequence;
+    // });
+    
+    // 记录原始数据信息
     if (sortedPosts.length > 0) {
-      console.log(`🔄 [SceneThreadFeed] 排序后顺序:`);
+      console.log(`🔄 [SceneThreadFeed] 原始数据顺序:`);
       sortedPosts.forEach((post, index) => {
         const mediaUrl = post.imgUrl || post.videoUrl || 'no-media';
-        const info = getMediaInfo(post);
-        console.log(`   ${index+1}. ID=${post.id}, EP=${info.epNumber}, 序号=${info.sequence}, 媒体=${mediaUrl}`);
+        console.log(`   ${index+1}. ID=${post.id}, 媒体=${mediaUrl}`);
       });
     }
     
