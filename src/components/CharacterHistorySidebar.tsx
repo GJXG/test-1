@@ -4,6 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useCocos } from './CocosEmbed';
 import { getNpcName } from '@/config/npc';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface CharacterHistorySidebarProps {
   characters: CharacterHistory[];
@@ -22,6 +28,7 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const { navigateToScene } = useCocos();
+  const [showComingSoon, setShowComingSoon] = React.useState(false);
 
   // 格式化时间，显示相对时间（例如：3小时前，2天前）
   const formatRelativeTime = (timestamp: number | undefined): string => {
@@ -120,11 +127,23 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
         </button>
         <button 
           className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-[#F3F3F3] hover:bg-[#EBEBEB] transition-colors"
-          onClick={() => navigateToScene("Level1")}
+          onClick={() => setShowComingSoon(true)}
         >
-          <span className="text-[#999999] font-semibold text-lg">Search</span>
+          <span className="text-[#999999] font-semibold text-lg">Build up Your Drama</span>
         </button>
       </div>
+
+      {/* Coming Soon Dialog */}
+      <Dialog open={showComingSoon} onOpenChange={setShowComingSoon}>
+        <DialogContent className="z-[9999]">
+          <DialogHeader className="text-center">
+            <DialogTitle>Coming Soon...</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-center">
+            <p className="text-gray-600">This feature is under development. Stay tuned!</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Character History - 占据剩余空间 */}
       <div className={cn(
