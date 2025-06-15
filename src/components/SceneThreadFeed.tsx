@@ -63,6 +63,10 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
   // 添加锁机制，防止重复触发加载
   const isLoadingRef = useRef<boolean>(false);
   
+  const [expandedCommentCounts, setExpandedCommentCounts] = useState<Record<number, number>>({});
+  const COMMENTS_PER_PAGE = 10;
+  const INITIAL_COMMENTS = 3;
+  
   // 监听交叉观察器，用于检测底部加载元素是否进入视口
   useEffect(() => {
     if (!loadingRef.current || loading || !hasMore) return;
@@ -364,9 +368,25 @@ const timeAgo = (timestamp: number) => {
     }
   };
 
+  const handleExpandComments = (postId: number) => {
+    setExpandedCommentCounts(prev => {
+      const currentCount = prev[postId] || INITIAL_COMMENTS;
+      const totalComments = posts.find(p => p.id === postId)?.tweetCommentVoList.length || 0;
+      
+      // 如果当前显示的数量小于总评论数，则增加显示数量
+      if (currentCount < totalComments) {
+        // 如果剩余评论数小于等于COMMENTS_PER_PAGE，则显示所有评论
+        const nextCount = Math.min(currentCount + COMMENTS_PER_PAGE, totalComments);
+        return { ...prev, [postId]: nextCount };
+      }
+      // 如果已经显示所有评论，则折叠回初始数量
+      return { ...prev, [postId]: INITIAL_COMMENTS };
+    });
+  };
+
   const renderComment = (comment: TweetComment, level = 0) => (
-    <div key={comment.id} className={`flex items-start space-x-3 mb-2 ${level > 0 ? 'ml-8' : ''}`}>
-      <div className="h-8 w-8 rounded-full overflow-hidden bg-gray-200 mt-2">
+    <div key={comment.id} className={`flex items-start space-x-3 ${level > 0 ? 'ml-8' : ''} py-0 border-b border-gray-100 last:border-b-0`}>
+      <div className="h-7 w-7 rounded-full overflow-hidden bg-gray-200 mt-2">
         {comment.authorAvatar && (
           <img
             src={comment.authorAvatar}
@@ -375,18 +395,18 @@ const timeAgo = (timestamp: number) => {
           />
         )}
       </div>
-      <div className="flex-1">
-        <div className="flex items-center space-x-2 mb-[-5px]">
+      <div className="flex-1 -mt-0.5">
+        <div className="flex items-center space-x-2">
           <span className="font-medium text-sm">{comment.nickName}</span>
           {comment.createTime && (
             <span className="text-xs text-gray-500">{timeAgo(comment.createTime)}</span>
           )}
         </div>
-        <p className="text-sm text-gray-400 mt-0">{comment.content}</p>
+        <p className="text-sm text-gray-400 mt-[-6px]">{comment.content}</p>
         
         {/* 嵌套评论 - 支持两种字段名 */}
         {(comment.tweetCommentVoList || comment.tweetCommentVo) && (
-          <div className="mt-2 space-y-2">
+          <div className="mt-0 space-y-0">
             {(comment.tweetCommentVoList || comment.tweetCommentVo || []).map(reply => 
               renderComment(reply, level + 1)
             )}
@@ -395,6 +415,38 @@ const timeAgo = (timestamp: number) => {
       </div>
     </div>
   );
+
+  const renderComments = (post: AIPost) => {
+    const comments = post.tweetCommentVoList;
+    const expandedCount = expandedCommentCounts[post.id] || INITIAL_COMMENTS;
+    const hasMoreComments = comments.length > expandedCount;
+
+    return (
+      <div className="mt-4 space-y-0">
+        {comments.slice(0, expandedCount).map(comment => renderComment(comment))}
+        
+        {hasMoreComments && (
+          <button
+            onClick={() => handleExpandComments(post.id)}
+            className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center space-x-1"
+          >
+            <span>Show {Math.min(COMMENTS_PER_PAGE, comments.length - expandedCount)} more comments</span>
+            <ChevronDown size={16} />
+          </button>
+        )}
+        
+        {expandedCount > INITIAL_COMMENTS && (
+          <button
+            onClick={() => handleExpandComments(post.id)}
+            className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center space-x-1"
+          >
+            <span>Show less</span>
+            <ChevronUp size={16} />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   const toggleVideoPlayback = (postId: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -727,13 +779,28 @@ const timeAgo = (timestamp: number) => {
         )}
 
         <div className="flex items-center justify-between mt-2">
-          <button 
-            className="flex items-center space-x-1 text-gray-500 hover:text-gray-700"
-            onClick={() => toggleExpand(post.id)}
-          >
-            <MessageSquare size={20} />
-            <span className="text-sm">{post.commentCount}</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button 
+              className="flex items-center space-x-1 text-gray-500 hover:text-gray-700"
+              onClick={() => toggleExpand(post.id)}
+            >
+              <MessageSquare size={20} />
+              <span className="text-sm">{post.commentCount}</span>
+            </button>
+            {post.commentCount > 0 && (
+              <button
+                onClick={() => toggleExpand(post.id)}
+                className="flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                title={expandedPosts[post.id] ? "折叠评论" : "展开评论"}
+              >
+                {expandedPosts[post.id] ? (
+                  <ChevronUp size={16} />
+                ) : (
+                  <ChevronDown size={16} />
+                )}
+              </button>
+            )}
+          </div>
           
           <button 
             className="flex items-center space-x-1 text-gray-500 hover:text-gray-700"
@@ -768,13 +835,13 @@ const timeAgo = (timestamp: number) => {
               </div>
             )}
 
-            {post.tweetCommentVoList.map(comment => renderComment(comment))}
+            {renderComments(post)}
           </div>
         )}
       </div>
     ))
     return result;
-  }, [posts, expandedPosts, newComment, localLikes, playingVideos, videoLoading, videoErrors]);
+  }, [posts, expandedPosts, newComment, localLikes, playingVideos, videoLoading, videoErrors, expandedCommentCounts]);
 
   // 检查是否有数据但未显示
   useEffect(() => {
