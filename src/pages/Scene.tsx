@@ -615,16 +615,16 @@ const Scene: React.FC = () => {
       });
       
       // 根据操作类型显示不同的成功消息
-      let successMessage = "Operation successful";
+      let successMessage = "Action completed successfully";
       switch (responseData?.type) {
         case 1:
-          successMessage = "Like successful";
+          successMessage = "Like added successfully";
           break;
         case 2:
-          successMessage = `Comment successful${responseData?.commentId ? ` (Comment ID: ${responseData.commentId})` : ''}`;
+          successMessage = `Comment posted successfully${responseData?.commentId ? ` (Comment ID: ${responseData.commentId})` : ''}`;
           break;
         case 3:
-          successMessage = "Vote successful";
+          successMessage = "Vote submitted successfully";
           break;
       }
       

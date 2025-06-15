@@ -7,11 +7,10 @@ interface SocialMediaIconsProps {
 
 const SocialMediaIcons: React.FC<SocialMediaIconsProps> = ({ className }) => {
   const socialLinks = [
-    { name: 'Discord', icon: '/icons/discord.svg', url: 'https://discord.gg/dramai' },
-    { name: 'Instagram', icon: '/icons/instagram.svg', url: 'https://instagram.com/dramai' },
-    { name: 'Twitter', icon: '/icons/twitter.svg', url: 'https://twitter.com/dramai' },
-    { name: 'TikTok', icon: '/icons/tiktok.svg', url: 'https://tiktok.com/@dramai' },
-    { name: 'Reddit', icon: '/icons/reddit.svg', url: 'https://reddit.com/r/dramai' },
+    { name: 'Discord', icon: '/icons/discord.svg', url: 'https://discord.gg/jkaHfJED' },
+    { name: 'Instagram', icon: '/icons/instagram.svg', url: 'https://www.instagram.com/dramaiofficial/' },
+    { name: 'Twitter', icon: '/icons/twitter.svg', url: 'https://x.com/drama_i_' },
+    { name: 'TikTok', icon: '/icons/tiktok.svg', url: 'https://www.tiktok.com/@drama_i_?_t=ZT-8wwib4owali&_r=1' },
   ];
 
   return (

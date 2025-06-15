@@ -175,14 +175,14 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2">
             {/* Live Now 图标 - 折叠时完全隐藏 */}
             <div className={cn(
-              "flex items-center transition-all duration-300 ease-in-out transform",
+              "flex items-center transition-all duration-300 ease-in-out transform absolute right-[60px]",
               collapsed 
                 ? "opacity-0 scale-75 pointer-events-none translate-x-2" 
                 : "opacity-100 scale-100 pointer-events-auto translate-x-0"
             )}>
-            <img
-              src="/icons/live-now.png"
-              alt="Live Now"
+              <img
+                src="/icons/live-now.png"
+                alt="Live Now"
                 className="h-9 w-auto object-contain mb-0 transition-all duration-300"
               />
             </div>

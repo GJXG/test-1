@@ -140,7 +140,7 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
             <DialogTitle>Coming Soon...</DialogTitle>
           </DialogHeader>
           <div className="py-4 text-center">
-            <p className="text-gray-600">This feature is under development. Stay tuned!</p>
+            <p className="text-gray-600 text-xl">This feature is under development. Stay tuned!</p>
           </div>
         </DialogContent>
       </Dialog>
