@@ -24,7 +24,8 @@ const AppRoutes: React.FC = () => {
   // 检测到移动端时重定向到外部链接
   React.useEffect(() => {
     if (isMobile) {
-      window.location.href = 'https://dramai.world/test/';
+      // 使用 replace 替换当前历史记录条目，避免后退时循环跳转
+      window.location.replace('https://dramai.world/test/');
     }
   }, [isMobile]);
 
