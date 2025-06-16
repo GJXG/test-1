@@ -4,12 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useCocos } from './CocosEmbed';
 import { getNpcName } from '@/config/npc';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface CharacterHistorySidebarProps {
   characters: CharacterHistory[];
@@ -28,7 +22,17 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const { navigateToScene } = useCocos();
-  const [showComingSoon, setShowComingSoon] = React.useState(false);
+
+  // 添加调试日志
+  React.useEffect(() => {
+    console.log('🎭 CharacterHistorySidebar Debug:', {
+      charactersLength: characters.length,
+      characters: characters.map(c => ({ npcId: c.npcId, name: c.name })),
+      isUserInfoFolded,
+      npcSwitchLoading,
+      className
+    });
+  }, [characters, isUserInfoFolded, npcSwitchLoading, className]);
 
   // 格式化时间，显示相对时间（例如：3小时前，2天前）
   const formatRelativeTime = (timestamp: number | undefined): string => {
@@ -127,27 +131,15 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
         </button>
         <button 
           className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-[#F3F3F3] hover:bg-[#EBEBEB] transition-colors"
-          onClick={() => setShowComingSoon(true)}
+          onClick={() => navigateToScene("Level1")}
         >
-          <span className="text-[#999999] font-semibold text-lg">Build up Your Drama</span>
+          <span className="text-[#999999] font-semibold text-lg">Search</span>
         </button>
       </div>
 
-      {/* Coming Soon Dialog */}
-      <Dialog open={showComingSoon} onOpenChange={setShowComingSoon}>
-        <DialogContent className="z-[9999]">
-          <DialogHeader className="text-center">
-            <DialogTitle>Coming Soon...</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-center">
-            <p className="text-gray-600 text-xl">This feature is under development. Stay tuned!</p>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Character History - 占据剩余空间 */}
       <div className={cn(
-        "flex-1 min-h-0 space-y-1.5 overflow-y-auto bg-[#F6F6F6] p-2 rounded-2xl transition-all duration-300 relative",
+        "flex-1 min-h-0 space-y-1 overflow-y-auto bg-[#F6F6F6] p-2 rounded-2xl transition-all duration-300 relative",
         isUserInfoFolded ? "mt-4" : ""
       )}>
         {/* 加载状态覆盖层 */}
@@ -164,7 +156,7 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
           <div
             key={character.npcId}
             className={cn(
-              "bg-white rounded-2xl py-2 px-3 cursor-pointer hover:bg-gray-50 transition-all shadow-sm min-h-[18px]",
+              "bg-white rounded-2xl py-1.5 px-3 cursor-pointer hover:bg-gray-50 transition-all shadow-sm min-h-[18px]",
               npcSwitchLoading && "pointer-events-none opacity-50"
             )}
             onClick={() => handleCharacterClick(character.npcId)}
@@ -185,7 +177,7 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
                   ) : null}
                 </div>
                 <p className={cn(
-                  "text-gray-600 text-sm mt-1 line-clamp-3 leading-snug",
+                  "text-gray-600 text-sm mt-0.5 line-clamp-2 leading-[1]",
                   !character.description && "text-gray-300 italic"
                 )}>
                   {character.description || "No recent messages"}
