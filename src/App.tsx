@@ -21,6 +21,15 @@ const queryClient = new QueryClient();
 const AppRoutes: React.FC = () => {
   const isMobile = useIsMobile();
 
+  // 检测到移动端时重定向到外部链接
+  React.useEffect(() => {
+    if (isMobile) {
+      window.location.href = 'https://dramai.world/test/';
+    }
+  }, [isMobile]);
+
+  // 保留原有的移动端组件逻辑（已注释，如需恢复移动端组件可取消注释）
+  /*
   if (isMobile) {
     return (
       <Routes>
@@ -28,6 +37,7 @@ const AppRoutes: React.FC = () => {
       </Routes>
     );
   }
+  */
 
   return (
     <Routes>

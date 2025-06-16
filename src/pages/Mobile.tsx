@@ -47,11 +47,42 @@ const Mobile: React.FC = () => {
         </div>
         <div className="w-24 h-[1px] bg-gray-300 my-1"></div>
         <div className="flex gap-4">
-          <img src="/icons/discord.svg" alt="Discord" className="w-6 h-6" />
-          <img src="/icons/instagram.svg" alt="Instagram" className="w-6 h-6" />
-          <img src="/icons/twitter.svg" alt="Twitter" className="w-6 h-6" />
-          <img src="/icons/tiktok.svg" alt="TikTok" className="w-6 h-6" />
-          <img src="/icons/reddit.svg" alt="Reddit" className="w-6 h-6" />
+          <a
+            href="https://discord.gg/jkaHfJED"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title="Discord"
+          >
+            <img src="/icons/discord.svg" alt="Discord" className="w-6 h-6" />
+          </a>
+          <a
+            href="https://www.instagram.com/dramaiofficial/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title="Instagram"
+          >
+            <img src="/icons/instagram.svg" alt="Instagram" className="w-6 h-6" />
+          </a>
+          <a
+            href="https://x.com/drama_i_"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title="Twitter"
+          >
+            <img src="/icons/twitter.svg" alt="Twitter" className="w-6 h-6" />
+          </a>
+          <a
+            href="https://www.tiktok.com/@drama_i_?_t=ZT-8wwib4owali&_r=1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title="TikTok"
+          >
+            <img src="/icons/tiktok.svg" alt="TikTok" className="w-6 h-6" />
+          </a>
         </div>
       </div>
 
