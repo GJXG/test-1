@@ -579,8 +579,8 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
           </div>
         )}
         
-        {/* 静音按钮 */}
-        {showIframe && (
+        {/* 静音按钮 - 已注释掉UI界面 */}
+        {/* {showIframe && (
           <button
             onClick={toggleMute}
             className="absolute top-3 left-3 w-10 h-10 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full transition-all duration-200 z-[1001] backdrop-blur-sm"
@@ -602,7 +602,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
               </svg>
             )}
           </button>
-        )}
+        )} */}
         
       {children}
       </div>
