@@ -506,7 +506,7 @@ const BuildDrama: React.FC = () => {
       }
     };
 
-    if (effectiveSceneId && effectiveSceneId !== 'MainMenu') {
+    if (effectiveSceneId) {
       loadSceneGenericData();
     }
   }, [effectiveSceneId, shouldSendRequest]);
@@ -534,7 +534,7 @@ const BuildDrama: React.FC = () => {
       }
     };
 
-    if (effectiveSceneId && effectiveSceneId !== 'MainMenu' && selectedEpisode !== null) {
+    if (effectiveSceneId && selectedEpisode !== null) {
       loadEpisodePosts();
     }
     
