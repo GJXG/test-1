@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Index from "./pages/Index";
 import Scene from "./pages/Scene";
+import BuildDrama from "./pages/BuildDrama";
 import NotFound from "./pages/NotFound";
 import Mobile from "./pages/Mobile";
 import { GlobalIframe, CocosProvider } from "./components/CocosEmbed";
@@ -48,6 +49,7 @@ const AppRoutes: React.FC = () => {
       {/* Main app routes */}
       <Route path="/home" element={<Index />} />
       <Route path="/scene" element={<Scene />} />
+      <Route path="/build-drama" element={<BuildDrama />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/terms-of-service" element={<TermsOfService />} />
       <Route path="/community-guidelines" element={<CommunityGuidelines />} />

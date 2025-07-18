@@ -24,6 +24,7 @@ interface SidebarProps {
   isUserInfoFolded?: boolean;
   onSelectNpc?: (npcId: number) => void;
   npcSwitchLoading?: boolean;
+  showCharacterHistory?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -35,7 +36,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   isUserInfoFolded,
   onSelectNpc,
-  npcSwitchLoading = false
+  npcSwitchLoading = false,
+  showCharacterHistory = true
 }) => {
   const location = useLocation();
   const isScenePage = location.pathname === '/scene';
@@ -60,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             isUserInfoFolded={isFolded}
             onSelectNpc={onSelectNpc}
             npcSwitchLoading={npcSwitchLoading}
+            showCharacterHistory={showCharacterHistory}
           />
         </div>
       </div>

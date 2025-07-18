@@ -34,6 +34,7 @@ interface HeaderProps {
   onLogoClick?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: (collapsed: boolean) => void;
+  showTags?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -42,7 +43,8 @@ const Header: React.FC<HeaderProps> = ({
   className, 
   onLogoClick,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  showTags = true
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -146,30 +148,32 @@ const Header: React.FC<HeaderProps> = ({
           location.pathname === '/' ? "-mt-5" : "mt-0",
           collapsed ? "h-8 py-0" : "h-auto py-2"
         )}>
-          {/* Tags section - 折叠时隐藏 */}
-          <div className={cn(
-            "flex gap-6 transition-all duration-300 ease-in-out transform",
-            collapsed 
-              ? "opacity-0 scale-95 pointer-events-none translate-y-1" 
-              : "opacity-100 scale-100 pointer-events-auto translate-y-0"
-          )}>
-            {tags.map((tag) => (
-              <button
-                key={tag.id}
-                onClick={() => handleTagClick(tag.id)}
-                className={cn(
-                  "transition-all duration-200 hover:scale-105 flex items-end transform",
-                  selectedTag === tag.id ? "opacity-100" : "opacity-70 hover:opacity-90"
-                )}
-              >
-                <img
-                  src={selectedTag === tag.id ? tag.activeIconUrl : tag.inactiveIconUrl}
-                  alt={tag.label}
-                  className="w-56 h-10 object-contain transition-all duration-300"
-                />
-              </button>
-            ))}
-          </div>
+          {/* Tags section - 折叠时隐藏或者showTags为false时隐藏 */}
+          {showTags && (
+            <div className={cn(
+              "flex gap-6 transition-all duration-300 ease-in-out transform",
+              collapsed 
+                ? "opacity-0 scale-95 pointer-events-none translate-y-1" 
+                : "opacity-100 scale-100 pointer-events-auto translate-y-0"
+            )}>
+              {tags.map((tag) => (
+                <button
+                  key={tag.id}
+                  onClick={() => handleTagClick(tag.id)}
+                  className={cn(
+                    "transition-all duration-200 hover:scale-105 flex items-end transform",
+                    selectedTag === tag.id ? "opacity-100" : "opacity-70 hover:opacity-90"
+                  )}
+                >
+                  <img
+                    src={selectedTag === tag.id ? tag.activeIconUrl : tag.inactiveIconUrl}
+                    alt={tag.label}
+                    className="w-56 h-10 object-contain transition-all duration-300"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Right section - 包含live-now图标和折叠按钮 */}
           <div className="flex items-center gap-2">

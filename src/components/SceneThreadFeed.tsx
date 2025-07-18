@@ -346,25 +346,25 @@ const timeAgo = (timestamp: number) => {
     };
   };
 
-  // 从图片URL中提取图片名称（不包含扩展名）
-  const getImageNameFromUrl = (imgUrl: string): string => {
-    if (!imgUrl) return 'Expand';
+  // 从图片/视频URL中提取文件名称（不包含扩展名）
+  const getImageNameFromUrl = (mediaUrl: string): string => {
+    if (!mediaUrl) return 'No Media';
     
     try {
       // 从URL中提取文件名
-      const filename = imgUrl.split('/').pop() || '';
+      const filename = mediaUrl.split('/').pop() || '';
       
-      // 匹配 EP{数字}-{数字}.png 格式并提取名称部分
-      const match = filename.match(/^(EP\d+-\d+)\.png$/i);
+      // 匹配 EP{数字}-{数字}.{扩展名} 格式并提取名称部分（支持多种文件格式）
+      const match = filename.match(/^(EP\d+-\d+)\.(png|jpg|jpeg|mp4|avi|mov|webm)$/i);
       if (match) {
         return match[1]; // 返回 EP15-7 这样的格式
       }
       
       // 如果不匹配预期格式，返回文件名（去掉扩展名）
-      return filename.replace(/\.[^/.]+$/, '') || 'Expand';
+      return filename.replace(/\.[^/.]+$/, '') || 'Unknown';
     } catch (error) {
-      console.error('Failed to extract image name from URL:', error);
-      return 'Expand';
+      console.error('Failed to extract media name from URL:', error);
+      return 'Error';
     }
   };
 
@@ -675,8 +675,10 @@ const timeAgo = (timestamp: number) => {
     const result = sortedPosts.map(post => (
       <div
         key={post.id}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 transition hover:shadow-md"
+        className="bg-white dark:bg-gray-800 transition hover:shadow-md"
       >
+        {/* Hidden: NPC名称、头像和内容 */}
+        {/* 
         <div className="flex items-start space-x-3">
           <div className="h-12 w-12 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 mt-3">
             {
@@ -699,9 +701,10 @@ const timeAgo = (timestamp: number) => {
             </p>
           </div>
         </div>
+        */}
         
         {post.videoUrl ? (
-          <div className="mt-3 rounded-xl overflow-hidden relative group">
+          <div className="overflow-hidden relative group">
             <video
               ref={el => { videoRefs.current[post.id] = el; }}
               src={post.videoUrl}
@@ -758,9 +761,53 @@ const timeAgo = (timestamp: number) => {
               </div>
             )}
             
-            <div className="absolute bottom-0 right-0 p-2">
+            {/* Floating containers at bottom of video */}
+            <div className="absolute bottom-2 left-2 right-12 flex items-center justify-between">
+              {/* Left side: Comment and Like containers */}
+              <div className="flex items-center space-x-2">
+                {/* Comment container */}
+                <div className="flex items-center space-x-2">
+                  <button 
+                    className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                    onClick={() => toggleExpand(post.id)}
+                  >
+                    <MessageSquare size={16} />
+                    <span className="text-xs">{post.commentCount}</span>
+                  </button>
+                  {post.commentCount > 0 && (
+                    <button
+                      onClick={() => toggleExpand(post.id)}
+                      className="bg-white hover:bg-gray-100 text-black p-1 rounded-md transition-colors shadow-sm"
+                      title={expandedPosts[post.id] ? "折叠评论" : "展开评论"}
+                    >
+                      {expandedPosts[post.id] ? (
+                        <ChevronUp size={14} />
+                      ) : (
+                        <ChevronDown size={14} />
+                      )}
+                    </button>
+                  )}
+                </div>
+                
+                {/* Like container */}
+                <button 
+                  className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                  onClick={() => handleLike(post)}
+                >
+                  <Heart size={16} className={isPostLiked(post) ? "fill-red-500 text-red-500" : ""} />
+                  <span className="text-xs">{post.likeCount}</span>
+                </button>
+              </div>
+
+              {/* Right side: Tag container */}
+              <div className="bg-white text-black px-2 py-1 rounded-md text-xs shadow-sm">
+                {getImageNameFromUrl(post.videoUrl)}
+              </div>
+            </div>
+            
+            <div className="absolute bottom-2 right-2">
               <button
-                className="w-8 h-8 rounded-full bg-black bg-opacity-50 flex items-center justify-center text-white"
+                className="w-8 h-8 rounded-full bg-black/70 hover:bg-black/80 flex items-center justify-center text-white transition-colors"
                 onClick={(e) => toggleFullscreen(post.id, e)}
               >
                 <Maximize size={16} />
@@ -768,55 +815,107 @@ const timeAgo = (timestamp: number) => {
             </div>
           </div>
         ) : post.imgUrl && (
-          <div className="mt-3 rounded-xl overflow-hidden">
+          <div className="overflow-hidden relative">
             <img
               src={post.imgUrl}
               alt="Post image"
               className="w-full h-auto object-cover"
               loading="lazy"
             />
+            {/* Floating containers at bottom of image */}
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+              {/* Left side: Comment and Like containers */}
+              <div className="flex items-center space-x-2">
+                {/* Comment container */}
+                <div className="flex items-center space-x-2">
+                  <button 
+                    className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                    onClick={() => toggleExpand(post.id)}
+                  >
+                    <MessageSquare size={16} />
+                    <span className="text-xs">{post.commentCount}</span>
+                  </button>
+                  {post.commentCount > 0 && (
+                    <button
+                      onClick={() => toggleExpand(post.id)}
+                      className="bg-white hover:bg-gray-100 text-black p-1 rounded-md transition-colors shadow-sm"
+                      title={expandedPosts[post.id] ? "折叠评论" : "展开评论"}
+                    >
+                      {expandedPosts[post.id] ? (
+                        <ChevronUp size={14} />
+                      ) : (
+                        <ChevronDown size={14} />
+                      )}
+                    </button>
+                  )}
+                </div>
+                
+                {/* Like container */}
+                <button 
+                  className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                  onClick={() => handleLike(post)}
+                >
+                  <Heart size={16} className={isPostLiked(post) ? "fill-red-500 text-red-500" : ""} />
+                  <span className="text-xs">{post.likeCount}</span>
+                </button>
+              </div>
+
+              {/* Right side: Tag container */}
+              <div className="bg-white text-black px-2 py-1 rounded-md text-xs shadow-sm">
+                {getImageNameFromUrl(post.imgUrl)}
+              </div>
+            </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center space-x-2">
-            <button 
-              className="flex items-center space-x-1 text-gray-500 hover:text-gray-700"
-              onClick={() => toggleExpand(post.id)}
-            >
-              <MessageSquare size={20} />
-              <span className="text-sm">{post.commentCount}</span>
-            </button>
-            {post.commentCount > 0 && (
-              <button
-                onClick={() => toggleExpand(post.id)}
-                className="flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                title={expandedPosts[post.id] ? "折叠评论" : "展开评论"}
-              >
-                {expandedPosts[post.id] ? (
-                  <ChevronUp size={16} />
-                ) : (
-                  <ChevronDown size={16} />
+        {/* Fallback for posts without images or videos */}
+        {!post.imgUrl && !post.videoUrl && (
+          <div className="flex items-center justify-between">
+            {/* Left side: Comment and Like containers */}
+            <div className="flex items-center space-x-2">
+              {/* Comment container */}
+              <div className="flex items-center space-x-2">
+                <button 
+                  className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                  onClick={() => toggleExpand(post.id)}
+                >
+                  <MessageSquare size={16} />
+                  <span className="text-xs">{post.commentCount}</span>
+                </button>
+                {post.commentCount > 0 && (
+                  <button
+                    onClick={() => toggleExpand(post.id)}
+                    className="bg-white hover:bg-gray-100 text-black p-1 rounded-md transition-colors shadow-sm"
+                    title={expandedPosts[post.id] ? "折叠评论" : "展开评论"}
+                  >
+                    {expandedPosts[post.id] ? (
+                      <ChevronUp size={14} />
+                    ) : (
+                      <ChevronDown size={14} />
+                    )}
+                  </button>
                 )}
+              </div>
+              
+              {/* Like container */}
+              <button 
+                className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                onClick={() => handleLike(post)}
+              >
+                <Heart size={16} className={isPostLiked(post) ? "fill-red-500 text-red-500" : ""} />
+                <span className="text-xs">{post.likeCount}</span>
               </button>
-            )}
-          </div>
-          
-          <button 
-            className="flex items-center space-x-1 text-gray-500 hover:text-gray-700"
-            onClick={() => handleLike(post)}
-          >
-            <Heart size={20} className={isPostLiked(post) ? "fill-red-500 text-red-500" : ""} />
-            <span className="text-sm">{post.likeCount}</span>
-          </button>
+            </div>
 
-          <div className="flex items-center space-x-1 text-gray-500 ml-auto">
-            <span className="text-sm">{getImageNameFromUrl(post.imgUrl)}</span>
+            {/* Right side: Tag container */}
+            <div className="bg-white text-black px-2 py-1 rounded-md text-xs shadow-sm">
+              No Media
+            </div>
           </div>
-        </div>
+        )}
 
         {expandedPosts[post.id] && (
-          <div className="mt-4 space-y-4">
+          <div className="mt-1 space-y-1">
             {isSignedIn && (
               <div className="flex items-center space-x-2">
                 <input
@@ -871,7 +970,7 @@ const timeAgo = (timestamp: number) => {
   }, [loading, posts.length]);
 
   return (
-    <div ref={feedRef} className={cn("flex flex-col space-y-4", className)}>
+    <div ref={feedRef} className={cn("flex flex-col space-y-0", className)}>
       {posts.length === 0 && loading ? (
         <div className="flex flex-col items-center justify-center h-64">
           <div className="text-center">
@@ -906,7 +1005,7 @@ const timeAgo = (timestamp: number) => {
       ) : (
         <>
           {/* 强制显示帖子内容，无论loading状态如何 */}
-          <div className="space-y-4">
+          <div className="space-y-0">
             {postsList}
           </div>
           

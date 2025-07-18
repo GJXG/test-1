@@ -12,15 +12,20 @@ import AppleLoginButton from './AppleLoginButton';
 interface SignInModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
+const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const navigate = useNavigate();
 
   const handleSuccess = () => {
     onClose();
-    // 使用 React Router 的 navigate 进行跳转
-    navigate('/home');
+    if (onSuccess) {
+      onSuccess();
+    } else {
+      // 默认行为：跳转到 /home
+      navigate('/home');
+    }
   };
 
   return (

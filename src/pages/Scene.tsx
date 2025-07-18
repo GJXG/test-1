@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import CocosEmbed, { useCocos } from '@/components/CocosEmbed';
 import SceneThreadFeed from '@/components/SceneThreadFeed';
-import VoteHistoryPanel from '@/components/VoteHistoryPanel';
+// import VoteHistoryPanel from '@/components/VoteHistoryPanel';
 import { CharacterHistory, AIPost, VoteHistory, ChatMessage } from '@/types/drama';
 // 导入NPC相关函数
 import { getNpcName } from '@/config/npc';
@@ -1366,23 +1366,17 @@ const Scene: React.FC = () => {
         />
         
           <div className="flex-1 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
-            {/* Game Embed Container - 维持486:864比例 */}
-            <div 
-              className="flex-shrink-0 w-full lg:w-auto max-w-full" 
-              style={{ 
-                aspectRatio: '486/864',
-                minHeight: '300px' // 确保在极小屏幕上也有最小高度
-              }}
-            >
+            {/* Game Embed Container - 自适应宽度，与Thread Feed同宽 */}
+            <div className="flex-1 h-full min-w-0 min-h-[400px]">
               <div className="w-full h-full relative rounded-lg overflow-hidden bg-white shadow-md">
                 <CocosEmbed sceneId={gameSceneId} className="w-full h-full" />
               </div>
             </div>
             
-            {/* Content Columns Container - 与Cocos容器同宽的基础上分配Thread和Vote */}
-            <div className="flex-1 flex flex-col lg:flex-row gap-4 h-full min-w-0">
-              {/* Thread Feed - 2/3 宽度 */}
-              <div className="flex-[2] h-full flex flex-col gap-2 min-w-0">
+            {/* Content Columns Container - 与Cocos容器同宽，包含Thread Feed */}
+            <div className="flex-1 flex flex-col gap-4 h-full min-w-0">
+              {/* Thread Feed - 占据全部宽度 */}
+              <div className="w-full h-full flex flex-col gap-2 min-w-0">
                 {/* Banner - 宽高比 1044:234 */}
                 <div 
                   className="w-full bg-gray-100 border border-gray-200 rounded-lg shadow-sm overflow-hidden"
@@ -1464,9 +1458,11 @@ const Scene: React.FC = () => {
                 </div>
               </div>
               
-              {/* Vote History - 1/3 宽度 (scene thread的1/2) */}
+              {/* Vote History - 1/3 宽度 (scene thread的1/2) - HIDDEN */}
+              {/* 
               <div className="flex-1 h-full flex flex-col gap-4 min-w-0">
                 {/* Vote Banner - 宽高比 522:234 */}
+                {/*
                 <div 
                   className="w-full bg-gray-100 border border-gray-200 rounded-lg shadow-sm overflow-hidden"
                   style={{ aspectRatio: '522/234' }}
@@ -1479,6 +1475,7 @@ const Scene: React.FC = () => {
                 </div>
                 
                 {/* Vote History Panel */}
+                {/*
                 <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
                 <VoteHistoryPanel 
                   voteHistory={filteredVotes} 
@@ -1487,6 +1484,7 @@ const Scene: React.FC = () => {
                 />
               </div>
             </div>
+            */}
           </div>
           </div>
       </main>
