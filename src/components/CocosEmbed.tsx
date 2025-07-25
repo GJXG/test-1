@@ -24,6 +24,7 @@ let globalSetShowIframe: ((show: boolean) => void) | null = null;
 let globalSetPosition: ((position: 'hidden' | 'container') => void) | null = null;
 let globalSetIsMuted: ((muted: boolean) => void) | null = null;
 let globalToggleMute: (() => void) | null = null;
+let globalSetIframeUrl: ((url: string) => void) | null = null;
 
 // 全局方法，用于发送消息到 iframe
 const sendMessageToIframe = (message: any) => {
@@ -233,6 +234,7 @@ export const GlobalIframe: React.FC = () => {
   const [showIframe, setShowIframe] = useState(false);
   const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
   const [isMuted, setIsMuted] = useState(false);
+  const [iframeUrl, setIframeUrl] = useState('https://dramai.world/webframe/'); // 默认URL
   const cocosContext = useCocos();
   
   // 初始化时从localStorage读取静音状态
@@ -280,10 +282,12 @@ export const GlobalIframe: React.FC = () => {
     globalSetShowIframe = setShowIframe;
     globalSetPosition = setPosition;
     globalSetIsMuted = setIsMuted;
+    globalSetIframeUrl = setIframeUrl; // 设置iframe URL更新函数
     return () => {
       globalSetShowIframe = null;
       globalSetPosition = null;
       globalSetIsMuted = null;
+      globalSetIframeUrl = null;
     };
   }, []);
   
@@ -292,7 +296,7 @@ export const GlobalIframe: React.FC = () => {
       {/* 单一iframe，根据position状态切换显示模式 */}
       <iframe
         ref={iframeRef}
-        src="https://dramai.world/webframe/"
+        src={iframeUrl}
         className={
           position === 'hidden' 
             ? "fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none border-0"
@@ -342,9 +346,10 @@ interface CocosEmbedProps {
   className?: string;
   children?: React.ReactNode;
   sceneId?: string;
+  iframeUrl?: string; // 添加自定义iframe URL的prop
 }
 
-const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId }) => {
+const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, iframeUrl }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>('');
   const [messageLog, setMessageLog] = useState<string[]>([]);
@@ -506,6 +511,11 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
 
   // 组件挂载时显示iframe并定位到容器
   useEffect(() => {
+    // 如果提供了自定义iframe URL，则更新全局iframe URL
+    if (iframeUrl && globalSetIframeUrl) {
+      globalSetIframeUrl(iframeUrl);
+    }
+    
     const timer = setTimeout(() => {
       setShowIframe(true);
       if (globalSetShowIframe) {
@@ -535,7 +545,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId })
         globalSetPosition('hidden');
       }
     };
-  }, []);
+  }, [iframeUrl]);
 
   // 当容器大小变化时重新定位iframe
   useEffect(() => {

@@ -210,7 +210,7 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
               ? "text-[#6B4EFF]" 
               : "text-[#999999]"
           )}>
-            Build up Your Drama
+            Build up Your Drama121
           </span>
         </button>
       </div>

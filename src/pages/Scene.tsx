@@ -1454,6 +1454,7 @@ const Scene: React.FC = () => {
                   currentPage={currentPage}
                   onPageChange={handlePageChange}
                   selectedEpisode={selectedEpisode}
+                  showManga={false} // 在Scene页面显示推文
                 />
                 </div>
               </div>

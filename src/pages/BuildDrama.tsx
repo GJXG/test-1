@@ -815,7 +815,11 @@ const BuildDrama: React.FC = () => {
             {/* Game Embed Container - 自适应宽度，与Thread Feed同宽 */}
             <div className="flex-1 h-full min-w-0 min-h-[400px]">
               <div className="w-full h-full relative rounded-lg overflow-hidden bg-white shadow-md">
-                <CocosEmbed sceneId={gameSceneId} className="w-full h-full" />
+                <CocosEmbed 
+                  sceneId={gameSceneId} 
+                  className="w-full h-full" 
+                  iframeUrl="https://dramai.world/custom/" 
+                />
               </div>
             </div>
             
@@ -879,7 +883,7 @@ const BuildDrama: React.FC = () => {
                         })
                       ) : (
                         <div className="col-span-5 text-center text-sm text-gray-500">
-                          No episodes available for this scene
+                          No episodes available for this scene123
                         </div>
                       )}
                     </div>
@@ -899,6 +903,7 @@ const BuildDrama: React.FC = () => {
                   currentPage={currentPage}
                   onPageChange={handlePageChange}
                   selectedEpisode={selectedEpisode}
+                  showManga={true} // 在BuildDrama页面显示漫画
                 />
                 </div>
               </div>
@@ -909,4 +914,4 @@ const BuildDrama: React.FC = () => {
   );
 };
 
-export default BuildDrama; 
+export default BuildDrama;

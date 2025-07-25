@@ -8,6 +8,14 @@ import { getNpcName, NpcName } from "@/config/npc";
 import { websocketService } from '@/services/websocket';
 import { Commands } from '@/services/websocket';
 
+//导入的漫画数据
+import {useGeneratedImages } from "./componentsData/GeneratedImage"
+
+const MangaViewer = ()=>{
+
+}
+
+
 interface SceneThreadFeedProps {
   posts: AIPost[];
   className?: string;
@@ -20,7 +28,10 @@ interface SceneThreadFeedProps {
   currentPage?: number;
   onPageChange?: (page: number) => void;
   selectedEpisode?: number | null;
+  showManga?: boolean; // 添加showManga prop
+
 }
+
 
 // 进度条颜色列表
 const BAR_COLORS = [
@@ -43,7 +54,8 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
   roomId = 0,
   currentPage = 0,
   onPageChange,
-  selectedEpisode = null
+  selectedEpisode = null,
+  showManga = false // 从props中获取showManga，默认为false（显示推文）
 }) => {
   const [expandedPosts, setExpandedPosts] = useState<Record<number, boolean>>({});
   const [newComment, setNewComment] = useState<Record<number, string>>({});
@@ -66,6 +78,10 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
   const [expandedCommentCounts, setExpandedCommentCounts] = useState<Record<number, number>>({});
   const COMMENTS_PER_PAGE = 10;
   const INITIAL_COMMENTS = 3;
+
+  //漫画相关数据
+  const { images, isLoading: imagesLoading, error: imagesError } = useGeneratedImages();
+  const [selectedComicId, setSelectedComicId] = useState<number>(1); // 默认选中ID为1的漫画
   
   // 监听交叉观察器，用于检测底部加载元素是否进入视口
   useEffect(() => {
@@ -971,62 +987,116 @@ const timeAgo = (timestamp: number) => {
 
   return (
     <div ref={feedRef} className={cn("flex flex-col space-y-0", className)}>
-      {posts.length === 0 && loading ? (
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
-        </div>
-      ) : posts.length === 0 ? (
-        <div className="flex flex-col justify-center items-center h-64 text-gray-500">
-          {selectedEpisode === null ? (
+      {/* 根据showManga的值决定显示漫画还是推文 */}
+      {showManga ? (
+        /* 漫画内容 */
+        <div className="p-4 border-b border-gray-200 bg-gray-50 dark:bg-gray-900">
+          <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">Generated Comics</h2>
+          {imagesLoading && (
+            <div className="text-center text-gray-500">Loading comics...</div>
+          )}
+          {imagesError && (
+            <div className="text-center text-red-500">{imagesError}</div>
+          )}
+          {/* 当图片加载成功后，渲染图片列表 */}
+          {images && images.length > 0 && (
             <>
-              <div className="text-center">
-                <div className="text-4xl mb-4">📺</div>
-                <h3 className="text-lg font-medium mb-2">Select an Episode</h3>
-                <p className="text-sm text-gray-400">
-                  Click "Select EP" above to choose an episode and view its content
-                </p>
+              {/* 按钮组用于切换不同的漫画集 */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {/* 获取所有唯一的漫画ID并创建按钮 */}
+                {[...new Set(images.map(image => image.Id))].map(id => (
+                  <button
+                    key={id}
+                    onClick={() => setSelectedComicId(id)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      selectedComicId === id
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {id === 1 ? 'ep1' : `ep${id}`}
+                  </button>
+                ))}
               </div>
-            </>
-          ) : (
-            <>
-              <div className="text-center">
-                <div className="text-4xl mb-4">📷</div>
-                <h3 className="text-lg font-medium mb-2">No content for EP{selectedEpisode}</h3>
-                <p className="text-sm text-gray-400">
-                  This episode may not have any images or videos yet
-                </p>
+              
+              {/* 显示选中ID的漫画 */}
+              <div className="flex space-x-4 overflow-x-auto pb-2">
+                {images
+                  .filter(image => image.Id === selectedComicId)
+                  .map(image => (
+                    <div key={image.Id} className="flex-shrink-0">
+                      <img
+                        src={image.ImgUrl}
+                        alt={`Comic panel ${image.Id}`}
+                        className="h-48 w-auto rounded-lg shadow-md object-cover"
+                      />
+                    </div>
+                  ))}
               </div>
             </>
           )}
         </div>
       ) : (
+        /* 推文内容 */
         <>
-          {/* 强制显示帖子内容，无论loading状态如何 */}
-          <div className="space-y-0">
-            {postsList}
-          </div>
-          
-          {/* 底部加载更多区域 */}
-          <div 
-            ref={loadingRef} 
-            className="py-4 flex justify-center items-center"
-          >
-            {loading || loadingMore ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
-                <span className="text-sm text-gray-500">Loading more...</span>
+          {posts.length === 0 && loading ? (
+            <div className="flex flex-col items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
               </div>
-            ) : hasMore ? (
-              <div className="h-10 flex items-center justify-center">
-                <span className="text-xs text-gray-400">Scroll to load more</span>
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="flex flex-col justify-center items-center h-64 text-gray-500">
+              {selectedEpisode === null ? (
+                <>
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">📺</div>
+                    <h3 className="text-lg font-medium mb-2">Select an Episode</h3>
+                    <p className="text-sm text-gray-400">
+                      Click "Select EP" above to choose an episode and view its content22
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">📷</div>
+                    <h3 className="text-lg font-medium mb-2">No content for EP{selectedEpisode}</h3>
+                    <p className="text-sm text-gray-400">
+                      This episode may not have any images or videos yet
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* 强制显示帖子内容，无论loading状态如何 */}
+              <div className="space-y-0">
+                {postsList}
               </div>
-            ) : (
-              <span className="text-xs text-gray-400">No more content</span>
-            )}
-          </div>
+              
+              {/* 底部加载更多区域 */}
+              <div 
+                ref={loadingRef} 
+                className="py-4 flex justify-center items-center"
+              >
+                {loading || loadingMore ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
+                    <span className="text-sm text-gray-500">Loading more...</span>
+                  </div>
+                ) : hasMore ? (
+                  <div className="h-10 flex items-center justify-center">
+                    <span className="text-xs text-gray-400">Scroll to load more</span>
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-400">No more content</span>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
