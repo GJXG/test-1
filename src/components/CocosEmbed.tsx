@@ -24,7 +24,6 @@ let globalSetShowIframe: ((show: boolean) => void) | null = null;
 let globalSetPosition: ((position: 'hidden' | 'container') => void) | null = null;
 let globalSetIsMuted: ((muted: boolean) => void) | null = null;
 let globalToggleMute: (() => void) | null = null;
-let globalSetIframeUrl: ((url: string) => void) | null = null;
 
 // 全局方法，用于发送消息到 iframe
 const sendMessageToIframe = (message: any) => {
@@ -234,7 +233,6 @@ export const GlobalIframe: React.FC = () => {
   const [showIframe, setShowIframe] = useState(false);
   const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
   const [isMuted, setIsMuted] = useState(false);
-  const [iframeUrl, setIframeUrl] = useState('https://dramai.world/webframe/'); // 默认URL
   const cocosContext = useCocos();
   
   // 初始化时从localStorage读取静音状态
@@ -282,12 +280,10 @@ export const GlobalIframe: React.FC = () => {
     globalSetShowIframe = setShowIframe;
     globalSetPosition = setPosition;
     globalSetIsMuted = setIsMuted;
-    globalSetIframeUrl = setIframeUrl; // 设置iframe URL更新函数
     return () => {
       globalSetShowIframe = null;
       globalSetPosition = null;
       globalSetIsMuted = null;
-      globalSetIframeUrl = null;
     };
   }, []);
   

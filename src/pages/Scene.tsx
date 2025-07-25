@@ -668,7 +668,7 @@ const Scene: React.FC = () => {
       });
     }
   }, [effectiveSceneId, selectedEpisode]);
-  
+
   // 初始化加载和设置WebSocket事件处理器
   useEffect(() => {
     console.log('Initializing WebSocket event handlers');
@@ -710,16 +710,16 @@ const Scene: React.FC = () => {
           // 使用请求跟踪函数检查是否应该发送请求
           if (shouldSendRequest(Commands.VOTE_THREAD, Number(effectiveSceneId))) {
             console.log('📤 [场景] 用户已登录，发送投票历史请求...');
-        websocketService.send(Commands.VOTE_THREAD, {
-          roomId: Number(effectiveSceneId)
+            websocketService.send(Commands.VOTE_THREAD, {
+              roomId: Number(effectiveSceneId)
             }, true);
           }
-        
-        setTimeout(() => {
+          
+          setTimeout(() => {
             if (shouldSendRequest(Commands.GET_CHARACTER_HISTORY, Number(effectiveSceneId))) {
               console.log('📤 [场景] 发送角色历史请求...');
-          websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-            roomId: Number(effectiveSceneId)
+              websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+                roomId: Number(effectiveSceneId)
               }, true);
             }
           }, 200);
@@ -776,7 +776,7 @@ const Scene: React.FC = () => {
               shouldSendRequest(Commands.GET_CHARACTER_HISTORY, roomId)) {
             const requestId = requestTrackerRef.current[`${Commands.VOTE_THREAD}_${roomId}`]?.requestId;
             websocketService.requestSceneData(roomId, requestId);
-    } else {
+          } else {
             console.log('🔄 请求追踪器显示请求已在短时间内发送过，跳过重复请求');
           }
           
@@ -821,7 +821,7 @@ const Scene: React.FC = () => {
     }
     
     // 清理函数
-      return () => {
+    return () => {
       window.removeEventListener('websocket-connected', handleWebSocketConnected);
     };
   }, [effectiveSceneId, shouldSendRequest]); // 添加shouldSendRequest作为依赖
