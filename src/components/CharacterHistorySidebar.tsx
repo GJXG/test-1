@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CharacterHistory } from '@/types/drama';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useCocos } from './CocosEmbed';
+import { useCocos, globalSetIframeUrl } from './CocosEmbed';
 import { getNpcName } from '@/config/npc';
 import InviteCodeModal from './InviteCodeModal';
 import SignInModal from './SignInModal';
@@ -116,7 +116,20 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
   };
 
   const handleLogoClick = () => {
-    navigate('/home');
+    // 恢复iframe URL为原始的webframe URL
+    if (globalSetIframeUrl) {
+      globalSetIframeUrl("https://dramai.world/webframe/");
+      console.log('[CharacterHistorySidebar] Logo点击，恢复iframe URL: https://dramai.world/webframe/');
+      
+      // 等待一小段时间确保iframe URL已更新
+      setTimeout(() => {
+        // 跳转到主页面
+        navigate('/home');
+      }, 100);
+    } else {
+      // 如果无法访问全局函数，则直接跳转
+      navigate('/home');
+    }
   };
 
   // 处理Build Drama按钮点击
@@ -133,10 +146,26 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
       return;
     }
 
-    // 已验证，先发送导航消息到iframe，然后跳转
-    navigateToScene("Custom");
-    console.log('[CharacterHistorySidebar] 点击Build Drama按钮，发送导航消息到iframe: target = Custom');
-    navigate('/build-drama');
+    // 已验证，先更新iframe URL，然后发送导航消息，最后跳转
+    // 更新全局iframe URL为test
+    if (globalSetIframeUrl) {
+      globalSetIframeUrl("https://dramai.world/test");
+      console.log('[CharacterHistorySidebar] 更新iframe URL: https://dramai.world/test');
+      
+      // 等待一小段时间确保iframe URL已更新
+      setTimeout(() => {
+        // 发送导航消息
+        navigateToScene("Custom");
+        console.log('[CharacterHistorySidebar] 点击Build Drama按钮，发送导航消息到iframe: target = Custom');
+        // 导航到Build Drama页面
+        navigate('/build-drama');
+      }, 100);
+    } else {
+      // 如果无法访问全局函数，则按原流程执行
+      navigateToScene("Custom");
+      console.log('[CharacterHistorySidebar] 点击Build Drama按钮，发送导航消息到iframe: target = Custom');
+      navigate('/build-drama');
+    }
   };
 
   // 处理登录成功
@@ -146,28 +175,66 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
     if (!checkInviteCodeVerified()) {
       setShowInviteCodeModal(true);
     } else {
-      // 发送导航消息到iframe，然后跳转
-      navigateToScene("Custom");
-      console.log('[CharacterHistorySidebar] 登录成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
-      navigate('/build-drama');
+      // 先更新iframe URL，然后发送导航消息，最后跳转
+      if (globalSetIframeUrl) {
+        globalSetIframeUrl("https://dramai.world/test");
+        console.log('[CharacterHistorySidebar] 更新iframe URL: https://dramai.world/test');
+        
+        // 等待一小段时间确保iframe URL已更新
+        setTimeout(() => {
+          navigateToScene("Custom");
+          console.log('[CharacterHistorySidebar] 登录成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
+          navigate('/build-drama');
+        }, 100);
+      } else {
+        navigateToScene("Custom");
+        console.log('[CharacterHistorySidebar] 登录成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
+        navigate('/build-drama');
+      }
     }
   };
 
   // 处理邀请码验证成功
   const handleInviteCodeSuccess = () => {
     setShowInviteCodeModal(false);
-    // 发送导航消息到iframe，然后跳转
-    navigateToScene("Custom");
-    console.log('[CharacterHistorySidebar] 邀请码验证成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
-    navigate('/build-drama');
+    // 先更新iframe URL，然后发送导航消息，最后跳转
+    if (globalSetIframeUrl) {
+      globalSetIframeUrl("https://dramai.world/test");
+      console.log('[CharacterHistorySidebar] 更新iframe URL: https://dramai.world/test');
+      
+      // 等待一小段时间确保iframe URL已更新
+      setTimeout(() => {
+        navigateToScene("Custom");
+        console.log('[CharacterHistorySidebar] 邀请码验证成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
+        navigate('/build-drama');
+      }, 100);
+    } else {
+      navigateToScene("Custom");
+      console.log('[CharacterHistorySidebar] 邀请码验证成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
+      navigate('/build-drama');
+    }
   };
 
   // 处理Discover Stories按钮点击
   const handleDiscoverStoriesClick = () => {
-    // 跳转到主页面
-    navigate('/home');
-    // 同时向游戏发送导航信号
-    navigateToScene("MainMenu");
+    // 恢复iframe URL为原始的webframe URL
+    if (globalSetIframeUrl) {
+      globalSetIframeUrl("https://dramai.world/webframe/");
+      console.log('[CharacterHistorySidebar] 恢复iframe URL: https://dramai.world/webframe/');
+      
+      // 等待一小段时间确保iframe URL已更新
+      setTimeout(() => {
+        // 同时向游戏发送导航信号
+        navigateToScene("MainMenu");
+        console.log('[CharacterHistorySidebar] 点击Discover Stories按钮，发送导航消息到iframe: target = MainMenu');
+        // 跳转到主页面
+        navigate('/home');
+      }, 100);
+    } else {
+      // 如果无法访问全局函数，则按原流程执行
+      navigate('/home');
+      navigateToScene("MainMenu");
+    }
   };
 
   return (

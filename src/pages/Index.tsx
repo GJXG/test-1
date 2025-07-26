@@ -9,6 +9,7 @@ import { MOCK_DRAMAS } from '@/mock/dramas';
 import { toast } from '@/components/ui/use-toast';
 import { MOCK_DRAMA_COVERS, MOCK_CHARACTERS } from '@/mock/scene-data';
 import { websocketService } from '@/services/websocket';
+import { globalSetIframeUrl, iframeRef } from '@/components/CocosEmbed';
 
 interface UserInfo {
   userId: string;
@@ -28,6 +29,38 @@ const Index = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+
+  // 确保在Index页面使用正确的iframe URL
+  useEffect(() => {
+    // 使用更可靠的方法设置iframe URL
+    const setupIframe = () => {
+      // 1. 直接修改iframe的src属性
+      if (iframeRef.current) {
+        console.log('[Index] 直接设置iframe.src: https://dramai.world/webframe/');
+        iframeRef.current.src = "https://dramai.world/webframe/";
+      }
+      
+      // 2. 同时也通过全局函数设置
+      if (globalSetIframeUrl) {
+        globalSetIframeUrl("https://dramai.world/webframe/");
+        console.log('[Index] 设置iframe URL: https://dramai.world/webframe/');
+      }
+      
+      // 3. 存储当前页面的iframe配置到localStorage
+      localStorage.setItem('currentIframeUrl', 'https://dramai.world/webframe/');
+      localStorage.setItem('currentPage', 'home');
+    };
+    
+    // 立即执行一次
+    setupIframe();
+    
+    // 再次延迟执行一次，以防第一次执行时iframe还未完全初始化
+    const secondAttemptTimeout = setTimeout(setupIframe, 1000);
+    
+    return () => {
+      clearTimeout(secondAttemptTimeout);
+    };
+  }, []);
 
   // Check login status on component mount and re-send login request
   useEffect(() => {

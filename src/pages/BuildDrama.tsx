@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
-import CocosEmbed, { useCocos } from '@/components/CocosEmbed';
+import CocosEmbed, { useCocos, globalSetIframeUrl, iframeRef } from '@/components/CocosEmbed';
 import SceneThreadFeed from '@/components/SceneThreadFeed';
 import { CharacterHistory, AIPost, VoteHistory, ChatMessage } from '@/types/drama';
 // 导入NPC相关函数
@@ -127,11 +127,39 @@ const BuildDrama: React.FC = () => {
     }
   }, []);
 
-  // Send navigation message to iframe when component mounts
+  // 确保使用正确的iframe URL并初始化WebSocket连接
   useEffect(() => {
-    // 发送导航到Custom场景的消息
-    navigateToScene("Custom");
-    console.log('[BuildDrama] 发送导航消息到iframe: target = Custom');
+    // 使用更可靠的方法设置iframe URL
+    const setupIframe = () => {
+      // 1. 直接修改iframe的src属性
+      if (iframeRef.current) {
+        console.log('[BuildDrama] 直接设置iframe.src: https://dramai.world/test');
+        iframeRef.current.src = "https://dramai.world/test";
+      }
+      
+      // 2. 同时也通过全局函数设置
+      if (globalSetIframeUrl) {
+        globalSetIframeUrl("https://dramai.world/test");
+        console.log('[BuildDrama] 设置iframe URL: https://dramai.world/test');
+      }
+      
+      // 3. 存储当前页面的iframe配置到localStorage
+      localStorage.setItem('currentIframeUrl', 'https://dramai.world/test');
+      localStorage.setItem('currentPage', 'build-drama');
+      
+      // 4. 等待一小段时间确保iframe URL已更新
+      setTimeout(() => {
+        // 发送导航消息到iframe
+        navigateToScene("Custom");
+        console.log('[BuildDrama] 页面刷新后重新发送导航消息到iframe: target = Custom');
+      }, 300); // 增加延迟时间，确保iframe有足够时间加载
+    };
+    
+    // 立即执行一次
+    setupIframe();
+    
+    // 再次延迟执行一次，以防第一次执行时iframe还未完全初始化
+    const secondAttemptTimeout = setTimeout(setupIframe, 1000);
     
     // 确保WebSocket连接已初始化
     if (!websocketService.isConnectionOpen()) {
@@ -146,8 +174,15 @@ const BuildDrama: React.FC = () => {
         }
       }, 3000);
       
-      return () => clearTimeout(checkConnectionTimeout);
+      return () => {
+        clearTimeout(checkConnectionTimeout);
+        clearTimeout(secondAttemptTimeout);
+      };
     }
+    
+    return () => {
+      clearTimeout(secondAttemptTimeout);
+    };
   }, []); // 空依赖数组，确保只在组件挂载时执行一次
 
   // 使用useRef保存当前页码，避免闭包问题

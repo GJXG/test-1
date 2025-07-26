@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { iframeRef } from './CocosEmbed';
+import { iframeRef, globalSetIframeUrl } from './CocosEmbed';
 
 const LoadingScreen: React.FC = () => {
   const [progress, setProgress] = useState(0);
@@ -8,12 +8,36 @@ const LoadingScreen: React.FC = () => {
   const navigate = useNavigate();
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Ensure iframe is loaded
+  // Ensure iframe is loaded with the correct URL
   useEffect(() => {
-    // If iframe source is not set, set it
-    if (iframeRef.current && !iframeRef.current.src) {
-      iframeRef.current.src = "https://dramai.world/webframe/";
-    }
+    // 使用更可靠的方法设置iframe URL
+    const setupIframe = () => {
+      // 1. 直接修改iframe的src属性
+      if (iframeRef.current) {
+        console.log('[LoadingScreen] 直接设置iframe.src: https://dramai.world/webframe/');
+        iframeRef.current.src = "https://dramai.world/webframe/";
+      }
+      
+      // 2. 同时也通过全局函数设置
+      if (globalSetIframeUrl) {
+        globalSetIframeUrl("https://dramai.world/webframe/");
+        console.log('[LoadingScreen] 设置iframe URL: https://dramai.world/webframe/');
+      }
+      
+      // 3. 存储当前页面的iframe配置到localStorage
+      localStorage.setItem('currentIframeUrl', 'https://dramai.world/webframe/');
+      localStorage.setItem('currentPage', 'loading');
+    };
+    
+    // 立即执行一次
+    setupIframe();
+    
+    // 再次延迟执行一次，以防第一次执行时iframe还未完全初始化
+    const secondAttemptTimeout = setTimeout(setupIframe, 500);
+    
+    return () => {
+      clearTimeout(secondAttemptTimeout);
+    };
   }, []);
 
   // Simulate progress bar growth
