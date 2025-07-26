@@ -127,6 +127,29 @@ const BuildDrama: React.FC = () => {
     }
   }, []);
 
+  // Send navigation message to iframe when component mounts
+  useEffect(() => {
+    // 发送导航到Custom场景的消息
+    navigateToScene("Custom");
+    console.log('[BuildDrama] 发送导航消息到iframe: target = Custom');
+    
+    // 确保WebSocket连接已初始化
+    if (!websocketService.isConnectionOpen()) {
+      console.log('[BuildDrama] WebSocket未连接，尝试初始化连接...');
+      // 这里不需要显式调用connect，因为isConnectionOpen检查会触发内部重连机制
+      // 但我们可以添加一个延迟检查
+      const checkConnectionTimeout = setTimeout(() => {
+        if (!websocketService.isConnectionOpen()) {
+          console.warn('[BuildDrama] WebSocket连接仍未建立，可能需要刷新页面');
+        } else {
+          console.log('[BuildDrama] WebSocket连接已成功建立');
+        }
+      }, 3000);
+      
+      return () => clearTimeout(checkConnectionTimeout);
+    }
+  }, []); // 空依赖数组，确保只在组件挂载时执行一次
+
   // 使用useRef保存当前页码，避免闭包问题
   const currentPageRef = React.useRef(currentPage);
   
@@ -458,15 +481,27 @@ const BuildDrama: React.FC = () => {
 
   // Hook 1: 加载场景相关数据（投票、角色历史）
   useEffect(() => {
-    const loadSceneGenericData = () => {
+    const loadSceneGenericData = async () => {
       console.log(`[BuildDrama 场景数据加载] 场景ID: ${effectiveSceneId}`);
       
       // 重置该场景ID的数据加载状态
       dataLoadedRef.current[effectiveSceneId] = false;
       
       setVotesLoading(true);
+      
+      // 尝试等待WebSocket连接建立
+      let retryCount = 0;
+      const maxRetries = 3;
+      let isConnected = websocketService.isConnectionOpen();
+      
+      while (!isConnected && retryCount < maxRetries) {
+        console.log(`[BuildDrama] WebSocket未连接，等待连接建立...尝试 ${retryCount + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        isConnected = websocketService.isConnectionOpen();
+        retryCount++;
+      }
 
-      if (websocketService.isConnectionOpen()) {
+      if (isConnected) {
         // 检查用户是否已登录
         const storedLoginStatus = localStorage.getItem('isSignedIn');
         const userIsLoggedIn = storedLoginStatus === 'true';
@@ -501,8 +536,15 @@ const BuildDrama: React.FC = () => {
         
         return () => clearTimeout(loadingTimeout);
       } else {
-        console.error('[BuildDrama] WebSocket未连接');
+        console.error('[BuildDrama] WebSocket连接失败，无法加载数据');
         setVotesLoading(false);
+        
+        // 显示友好的错误提示
+        toast({
+          title: "连接错误",
+          description: "无法连接到服务器，请检查网络连接后刷新页面",
+          variant: "destructive"
+        });
       }
     };
 
@@ -513,14 +555,26 @@ const BuildDrama: React.FC = () => {
 
   // Hook 2: 加载EP相关的推文数据
   useEffect(() => {
-    const loadEpisodePosts = () => {
+    const loadEpisodePosts = async () => {
       console.log(`[BuildDrama EP数据加载] EP: ${selectedEpisode}, 场景ID: ${effectiveSceneId}`);
       setPostsLoading(true);
       setAiPosts([]);
       setCurrentPage(0);
       currentPageRef.current = 0;
 
-      if (websocketService.isConnectionOpen()) {
+      // 尝试等待WebSocket连接建立
+      let retryCount = 0;
+      const maxRetries = 3;
+      let isConnected = websocketService.isConnectionOpen();
+      
+      while (!isConnected && retryCount < maxRetries) {
+        console.log(`[BuildDrama EP] WebSocket未连接，等待连接建立...尝试 ${retryCount + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        isConnected = websocketService.isConnectionOpen();
+        retryCount++;
+      }
+
+      if (isConnected) {
         console.log('📤 [BuildDrama EP] 发送推文数据请求...');
         websocketService.getSceneFeed(
           Number(effectiveSceneId), 
@@ -529,8 +583,17 @@ const BuildDrama: React.FC = () => {
           selectedEpisode
         );
       } else {
-        console.error('[BuildDrama] WebSocket未连接，无法加载推文数据');
+        console.error('[BuildDrama] WebSocket连接失败，无法加载推文数据');
         setPostsLoading(false);
+        
+        // 显示友好的错误提示，但不重复显示
+        if (retryCount === maxRetries) {
+          toast({
+            title: "连接错误",
+            description: "无法连接到服务器，请检查网络连接后刷新页面",
+            variant: "destructive"
+          });
+        }
       }
     };
 
@@ -818,7 +881,7 @@ const BuildDrama: React.FC = () => {
                 <CocosEmbed 
                   sceneId={gameSceneId} 
                   className="w-full h-full" 
-                  iframeUrl="https://dramai.world/custom/" 
+                  iframeUrl="https://dramai.world/test" 
                 />
               </div>
             </div>

@@ -133,7 +133,9 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
       return;
     }
 
-    // 已验证，直接跳转
+    // 已验证，先发送导航消息到iframe，然后跳转
+    navigateToScene("Custom");
+    console.log('[CharacterHistorySidebar] 点击Build Drama按钮，发送导航消息到iframe: target = Custom');
     navigate('/build-drama');
   };
 
@@ -144,6 +146,9 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
     if (!checkInviteCodeVerified()) {
       setShowInviteCodeModal(true);
     } else {
+      // 发送导航消息到iframe，然后跳转
+      navigateToScene("Custom");
+      console.log('[CharacterHistorySidebar] 登录成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
       navigate('/build-drama');
     }
   };
@@ -151,6 +156,9 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
   // 处理邀请码验证成功
   const handleInviteCodeSuccess = () => {
     setShowInviteCodeModal(false);
+    // 发送导航消息到iframe，然后跳转
+    navigateToScene("Custom");
+    console.log('[CharacterHistorySidebar] 邀请码验证成功后跳转Build Drama，发送导航消息到iframe: target = Custom');
     navigate('/build-drama');
   };
 
@@ -210,7 +218,7 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
               ? "text-[#6B4EFF]" 
               : "text-[#999999]"
           )}>
-            Build up Your Drama121
+            Build up Your Drama
           </span>
         </button>
       </div>
