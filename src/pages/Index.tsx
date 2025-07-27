@@ -77,6 +77,8 @@ const Index = () => {
     }
   }, []);
 
+
+
   // Mock API call to fetch tab content
   const fetchTabContent = async (tagId: string) => {
     setLoading(true);

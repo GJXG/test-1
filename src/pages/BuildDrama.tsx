@@ -129,10 +129,17 @@ const BuildDrama: React.FC = () => {
 
   // 页面加载时发送导航到Custom的消息
   useEffect(() => {
+    // 检查是否是页面刷新
+    const isPageRefresh = localStorage.getItem('isPageRefresh') === 'true';
+    
+    if (isPageRefresh) {
+      console.log('BuildDrama: 检测到页面刷新，跳过页面级别的导航消息发送');
+      return;
+    }
+    
     // 延迟发送消息，确保iframe已经加载
     const timer = setTimeout(() => {
       navigateToScene('Custom');
-      console.log('React: 页面刷新时自动发送导航消息到游戏iframe ->', { type: "SEND_CUSTOM_EVENT", data: { action: "navigate", target: "Custom" } });
     }, 2000); // 2秒延迟，确保iframe完全加载
 
     return () => clearTimeout(timer);

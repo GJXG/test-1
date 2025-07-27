@@ -239,6 +239,28 @@ const Scene: React.FC = () => {
     }
   }, []);
 
+  // 页面加载时发送导航消息到游戏iframe
+  useEffect(() => {
+    // 检查是否是页面刷新
+    const isPageRefresh = localStorage.getItem('isPageRefresh') === 'true';
+    
+    if (isPageRefresh) {
+      console.log('Scene: 检测到页面刷新，跳过页面级别的导航消息发送');
+      return;
+    }
+    
+    // 延迟发送消息，确保iframe已经加载
+    const timer = setTimeout(() => {
+      navigateToScene(gameSceneId);
+      console.log('React: Scene页面加载时发送导航消息到游戏iframe ->', { 
+        type: "SEND_CUSTOM_EVENT", 
+        data: { action: "navigate", target: gameSceneId } 
+      });
+    }, 2000); // 2秒延迟，确保iframe完全加载
+
+    return () => clearTimeout(timer);
+  }, [navigateToScene, gameSceneId]);
+
   // 使用useRef保存当前页码，避免闭包问题
   const currentPageRef = React.useRef(currentPage);
   
