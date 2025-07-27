@@ -20,11 +20,11 @@ export const CocosContext = createContext<CocosContextType | null>(null);
 // 全局状态，确保 iframe 一直存在
 export const iframeRef = React.createRef<HTMLIFrameElement>();
 let isGlobalInitialized = false;
-export let globalSetShowIframe: ((show: boolean) => void) | null = null;
-export let globalSetPosition: ((position: 'hidden' | 'container') => void) | null = null;
-export let globalSetIsMuted: ((muted: boolean) => void) | null = null;
-export let globalToggleMute: (() => void) | null = null;
-export let globalSetIframeUrl: ((url: string) => void) | null = null;
+let globalSetShowIframe: ((show: boolean) => void) | null = null;
+let globalSetPosition: ((position: 'hidden' | 'container') => void) | null = null;
+let globalSetIsMuted: ((muted: boolean) => void) | null = null;
+let globalToggleMute: (() => void) | null = null;
+let globalSetIframeUrl: ((url: string) => void) | null = null;
 
 // 全局方法，用于发送消息到 iframe
 const sendMessageToIframe = (message: any) => {
@@ -234,31 +234,7 @@ export const GlobalIframe: React.FC = () => {
   const [showIframe, setShowIframe] = useState(false);
   const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
   const [isMuted, setIsMuted] = useState(false);
-  
-  // 初始化时检查localStorage中的iframe URL配置
-  const initialUrl = () => {
-    try {
-      const storedUrl = localStorage.getItem('currentIframeUrl');
-      const currentPage = localStorage.getItem('currentPage');
-      const currentPath = window.location.pathname;
-      
-      console.log('[GlobalIframe] 初始化检查 - 当前路径:', currentPath, '存储的页面:', currentPage, '存储的URL:', storedUrl);
-      
-      // 如果当前路径是/build-drama，并且有存储的URL，则使用存储的URL
-      if (currentPath === '/build-drama' && storedUrl) {
-        console.log('[GlobalIframe] 使用存储的URL:', storedUrl);
-        return storedUrl;
-      }
-      
-      // 否则使用默认URL
-      return "https://dramai.world/webframe/";
-    } catch (error) {
-      console.error('读取iframe URL配置失败:', error);
-      return "https://dramai.world/webframe/";
-    }
-  };
-  
-  const [iframeUrl, setIframeUrl] = useState<string>(initialUrl());
+  const [iframeUrl, setIframeUrl] = useState<string>("https://dramai.world/webframe");
   const cocosContext = useCocos();
   
   // 初始化时从localStorage读取静音状态
