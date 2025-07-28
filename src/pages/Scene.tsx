@@ -239,28 +239,6 @@ const Scene: React.FC = () => {
     }
   }, []);
 
-  // 页面加载时发送导航消息到游戏iframe
-  useEffect(() => {
-    // 检查是否是页面刷新
-    const isPageRefresh = localStorage.getItem('isPageRefresh') === 'true';
-    
-    if (isPageRefresh) {
-      console.log('Scene: 检测到页面刷新，跳过页面级别的导航消息发送');
-      return;
-    }
-    
-    // 延迟发送消息，确保iframe已经加载
-    const timer = setTimeout(() => {
-      navigateToScene(gameSceneId);
-      console.log('React: Scene页面加载时发送导航消息到游戏iframe ->', { 
-        type: "SEND_CUSTOM_EVENT", 
-        data: { action: "navigate", target: gameSceneId } 
-      });
-    }, 2000); // 2秒延迟，确保iframe完全加载
-
-    return () => clearTimeout(timer);
-  }, [navigateToScene, gameSceneId]);
-
   // 使用useRef保存当前页码，避免闭包问题
   const currentPageRef = React.useRef(currentPage);
   
@@ -690,7 +668,7 @@ const Scene: React.FC = () => {
       });
     }
   }, [effectiveSceneId, selectedEpisode]);
-
+  
   // 初始化加载和设置WebSocket事件处理器
   useEffect(() => {
     console.log('Initializing WebSocket event handlers');
@@ -732,16 +710,16 @@ const Scene: React.FC = () => {
           // 使用请求跟踪函数检查是否应该发送请求
           if (shouldSendRequest(Commands.VOTE_THREAD, Number(effectiveSceneId))) {
             console.log('📤 [场景] 用户已登录，发送投票历史请求...');
-            websocketService.send(Commands.VOTE_THREAD, {
-              roomId: Number(effectiveSceneId)
+        websocketService.send(Commands.VOTE_THREAD, {
+          roomId: Number(effectiveSceneId)
             }, true);
           }
-          
-          setTimeout(() => {
+        
+        setTimeout(() => {
             if (shouldSendRequest(Commands.GET_CHARACTER_HISTORY, Number(effectiveSceneId))) {
               console.log('📤 [场景] 发送角色历史请求...');
-              websocketService.send(Commands.GET_CHARACTER_HISTORY, {
-                roomId: Number(effectiveSceneId)
+          websocketService.send(Commands.GET_CHARACTER_HISTORY, {
+            roomId: Number(effectiveSceneId)
               }, true);
             }
           }, 200);
@@ -798,7 +776,7 @@ const Scene: React.FC = () => {
               shouldSendRequest(Commands.GET_CHARACTER_HISTORY, roomId)) {
             const requestId = requestTrackerRef.current[`${Commands.VOTE_THREAD}_${roomId}`]?.requestId;
             websocketService.requestSceneData(roomId, requestId);
-          } else {
+    } else {
             console.log('🔄 请求追踪器显示请求已在短时间内发送过，跳过重复请求');
           }
           
@@ -843,7 +821,7 @@ const Scene: React.FC = () => {
     }
     
     // 清理函数
-    return () => {
+      return () => {
       window.removeEventListener('websocket-connected', handleWebSocketConnected);
     };
   }, [effectiveSceneId, shouldSendRequest]); // 添加shouldSendRequest作为依赖
