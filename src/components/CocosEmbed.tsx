@@ -26,9 +26,6 @@ let globalSetIsMuted: ((muted: boolean) => void) | null = null;
 let globalToggleMute: (() => void) | null = null;
 let globalSetIframeUrl: ((url: string) => void) | null = null;
 
-// 全局标记，用于防止重复发送导航消息
-let hasSentNavigationMessage = false;
-
 // 全局方法，用于发送消息到 iframe
 const sendMessageToIframe = (message: any) => {
   try {
@@ -141,12 +138,6 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [isMuted]);
 
   const navigateToScene = (target: string) => {
-    // 检查是否已经发送过导航消息，防止重复发送
-    if (hasSentNavigationMessage) {
-      console.log(`跳过重复的导航消息: ${target}`);
-      return;
-    }
-    
     sendMessageToGame({
       type: "SEND_CUSTOM_EVENT",
       data: {
@@ -154,105 +145,10 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         target: target
       }
     });
-    
-    // 标记已发送导航消息
-    hasSentNavigationMessage = true;
-    
-    // 5秒后重置标记，允许后续的导航
-    setTimeout(() => {
-      hasSentNavigationMessage = false;
-    }, 5000);
-    
     console.log(`Navigating to scene: ${target}`);
   };
 
-  // 页面刷新检测和自动导航
   useEffect(() => {
-    // 页面加载时重置导航消息标记
-    hasSentNavigationMessage = false;
-    
-    // 检测页面刷新
-    const handleBeforeUnload = () => {
-      // 在页面刷新前保存当前页面信息
-      const currentPath = window.location.pathname;
-      localStorage.setItem('lastPagePath', currentPath);
-      localStorage.setItem('pageRefreshTime', Date.now().toString());
-      // 添加标记，表示这是页面刷新
-      localStorage.setItem('isPageRefresh', 'true');
-      // 立即设置全局标记，防止重复发送
-      hasSentNavigationMessage = true;
-    };
-
-    // 检测页面加载完成
-    const handleLoad = () => {
-      const lastPath = localStorage.getItem('lastPagePath');
-      const refreshTime = localStorage.getItem('pageRefreshTime');
-      const isPageRefresh = localStorage.getItem('isPageRefresh');
-      const currentPath = window.location.pathname;
-      
-      // 立即清理存储的路径信息，避免重复处理
-      localStorage.removeItem('lastPagePath');
-      localStorage.removeItem('pageRefreshTime');
-      localStorage.removeItem('isPageRefresh');
-      
-      // 如果存在刷新标记且时间间隔很短（说明是刷新），则发送导航消息
-      if (isPageRefresh === 'true' && lastPath && refreshTime && lastPath === currentPath) {
-        const timeDiff = Date.now() - parseInt(refreshTime);
-        if (timeDiff < 5000) { // 5秒内的刷新认为是页面刷新
-          console.log('检测到页面刷新，准备发送导航消息');
-          
-          // 根据当前页面路径决定发送的导航目标
-          let navigationTarget = null;
-          
-          if (currentPath === '/build-drama') {
-            navigationTarget = 'Custom';
-          } else if (currentPath === '/scene') {
-            // 对于场景页面，需要从URL参数获取场景ID
-            const urlParams = new URLSearchParams(window.location.search);
-            const sceneId = urlParams.get('sceneId');
-            if (sceneId) {
-              navigationTarget = sceneId;
-            }
-          }
-          // Index页面（/home）不需要发送导航消息
-          
-          // 只有在需要发送导航消息时才发送
-          if (navigationTarget) {
-            // 延迟发送消息，确保iframe已经加载
-            const timer = setTimeout(() => {
-              navigateToScene(navigationTarget);
-              console.log('React: 页面刷新时自动发送导航消息到游戏iframe ->', { 
-                type: "SEND_CUSTOM_EVENT", 
-                data: { action: "navigate", target: navigationTarget } 
-              });
-            }, 2000); // 2秒延迟，确保iframe完全加载
-            
-            // 清理定时器
-            return () => clearTimeout(timer);
-          }
-        }
-      }
-    };
-
-    // 添加事件监听器
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('load', handleLoad);
-    
-    // 如果页面已经加载完成，立即检查页面刷新
-    if (document.readyState === 'complete') {
-      handleLoad();
-    }
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('load', handleLoad);
-    };
-  }, []);
-
-  useEffect(() => {
-    // 页面加载时重置导航消息标记
-    hasSentNavigationMessage = false;
-    
     // 处理从 iframe 接收的消息
     const handleMessage = (event: MessageEvent) => {
       try {
@@ -263,7 +159,7 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           // 检查是否有已登录的用户信息，如果有则发送邮箱
           const storedUserInfo = localStorage.getItem('userInfo');
           const storedLoginStatus = localStorage.getItem('isSignedIn');
-      
+          
           if (storedUserInfo && storedLoginStatus === 'true') {
             try {
               const userInfo = JSON.parse(storedUserInfo);
@@ -338,7 +234,7 @@ export const GlobalIframe: React.FC = () => {
   const [showIframe, setShowIframe] = useState(false);
   const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
   const [isMuted, setIsMuted] = useState(false);
-  const [iframeUrl, setIframeUrl] = useState<string>("https://dramai.world/webframe");
+  const [iframeUrl, setIframeUrl] = useState('https://dramai.world/webframe/'); // 默认URL
   const cocosContext = useCocos();
   
   // 初始化时从localStorage读取静音状态
@@ -386,7 +282,7 @@ export const GlobalIframe: React.FC = () => {
     globalSetShowIframe = setShowIframe;
     globalSetPosition = setPosition;
     globalSetIsMuted = setIsMuted;
-    globalSetIframeUrl = setIframeUrl;
+    globalSetIframeUrl = setIframeUrl; // 设置iframe URL更新函数
     return () => {
       globalSetShowIframe = null;
       globalSetPosition = null;
@@ -521,12 +417,6 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
 
   // 添加导航函数
   const navigateToScene = (target: string) => {
-    // 检查是否已经发送过导航消息，防止重复发送
-    if (hasSentNavigationMessage) {
-      console.log(`跳过重复的导航消息: ${target}`);
-      return;
-    }
-    
     sendMessageToGame({
       type: "SEND_CUSTOM_EVENT",
       data: {
@@ -534,15 +424,6 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
         target: target
       }
     });
-    
-    // 标记已发送导航消息
-    hasSentNavigationMessage = true;
-    
-    // 5秒后重置标记，允许后续的导航
-    setTimeout(() => {
-      hasSentNavigationMessage = false;
-    }, 5000);
-    
     console.log(`Navigating to scene: ${target}`);
   };
 

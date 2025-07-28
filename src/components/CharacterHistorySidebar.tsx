@@ -133,10 +133,6 @@ const CharacterHistorySidebar: React.FC<CharacterHistorySidebarProps> = ({
       return;
     }
 
-    // 向iframe发送导航到Custom的消息
-    navigateToScene('Custom');
-    console.log('React: 已发送导航消息到游戏iframe ->', { type: "SEND_CUSTOM_EVENT", data: { action: "navigate", target: "Custom" } });
-
     // 已验证，直接跳转
     navigate('/build-drama');
   };

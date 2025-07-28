@@ -28,6 +28,7 @@ interface SceneThreadFeedProps {
   currentPage?: number;
   onPageChange?: (page: number) => void;
   selectedEpisode?: number | null;
+  selectedComicEpisode?: number | null; // 添加selectedComicEpisode prop
   showManga?: boolean; // 添加showManga prop
 
 }
@@ -55,6 +56,7 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
   currentPage = 0,
   onPageChange,
   selectedEpisode = null,
+  selectedComicEpisode = null, // 从props中获取selectedComicEpisode
   showManga = false // 从props中获取showManga，默认为false（显示推文）
 }) => {
   const [expandedPosts, setExpandedPosts] = useState<Record<number, boolean>>({});
@@ -81,7 +83,6 @@ const SceneThreadFeed: React.FC<SceneThreadFeedProps> = ({
 
   //漫画相关数据
   const { images, isLoading: imagesLoading, error: imagesError } = useGeneratedImages();
-  const [selectedComicId, setSelectedComicId] = useState<number>(1); // 默认选中ID为1的漫画
   
   // 监听交叉观察器，用于检测底部加载元素是否进入视口
   useEffect(() => {
@@ -989,53 +990,122 @@ const timeAgo = (timestamp: number) => {
     <div ref={feedRef} className={cn("flex flex-col space-y-0", className)}>
       {/* 根据showManga的值决定显示漫画还是推文 */}
       {showManga ? (
-        /* 漫画内容 */
-        <div className="p-4 border-b border-gray-200 bg-gray-50 dark:bg-gray-900">
-          <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">Generated Comics</h2>
-          {imagesLoading && (
-            <div className="text-center text-gray-500">Loading comics...</div>
-          )}
-          {imagesError && (
-            <div className="text-center text-red-500">{imagesError}</div>
-          )}
-          {/* 当图片加载成功后，渲染图片列表 */}
-          {images && images.length > 0 && (
-            <>
-              {/* 按钮组用于切换不同的漫画集 */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {/* 获取所有唯一的漫画ID并创建按钮 */}
-                {[...new Set(images.map(image => image.Id))].map(id => (
-                  <button
-                    key={id}
-                    onClick={() => setSelectedComicId(id)}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      selectedComicId === id
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    {id === 1 ? 'ep1' : `ep${id}`}
-                  </button>
-                ))}
+        /* 漫画内容 - 使用与推文相同的样式 */
+        <>
+          {imagesLoading ? (
+            <div className="flex flex-col items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading comics...</p>
               </div>
-              
+            </div>
+          ) : imagesError ? (
+            <div className="flex flex-col justify-center items-center h-64 text-gray-500">
+              <div className="text-center">
+                <div className="text-4xl mb-4">📚</div>
+                <h3 className="text-lg font-medium mb-2">Error loading comics</h3>
+                <p className="text-sm text-gray-400">{imagesError}</p>
+              </div>
+            </div>
+          ) : images && images.length > 0 ? (
+            <>
               {/* 显示选中ID的漫画 */}
-              <div className="flex space-x-4 overflow-x-auto pb-2">
+              <div className="space-y-0">
                 {images
-                  .filter(image => image.Id === selectedComicId)
+                  .filter(image => selectedComicEpisode === null || image.Id === selectedComicEpisode)
                   .map(image => (
-                    <div key={image.Id} className="flex-shrink-0">
-                      <img
-                        src={image.ImgUrl}
-                        alt={`Comic panel ${image.Id}`}
-                        className="h-48 w-auto rounded-lg shadow-md object-cover"
-                      />
+                    <div
+                      key={image.Id}
+                      className="bg-white dark:bg-gray-800 transition hover:shadow-md"
+                    >
+                      <div className="overflow-hidden relative">
+                        <img
+                          src={image.ImgUrl}
+                          alt={`Comic panel ${image.Id}`}
+                          className="w-full h-auto object-cover"
+                          loading="lazy"
+                        />
+                        {/* Floating containers at bottom of image */}
+                        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                          {/* Left side: Comment and Like containers */}
+                          <div className="flex items-center space-x-2">
+                            {/* Comment container */}
+                            {/* <div className="flex items-center space-x-2">
+                              <button 
+                                className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                                onClick={() => toggleExpand(image.Id)}
+                              >
+                                <MessageSquare size={16} />
+                                <span className="text-xs">0</span>
+                              </button>
+                              <button
+                                onClick={() => toggleExpand(image.Id)}
+                                className="bg-white hover:bg-gray-100 text-black p-1 rounded-md transition-colors shadow-sm"
+                                title="展开评论"
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                            </div> */}
+                            
+                            {/* Like container */}
+                            {/* <button 
+                              className="flex items-center space-x-1 bg-white hover:bg-gray-100 text-black px-2 py-1 rounded-md text-sm transition-colors shadow-sm"
+                              onClick={() => handleLike({id: image.Id} as AIPost)}
+                            >
+                              <Heart size={16} />
+                              <span className="text-xs">0</span>
+                            </button> */}
+                          </div>
+
+                          {/* Right side: Tag container */}
+                          <div className="bg-white text-black px-2 py-1 rounded-md text-xs shadow-sm">
+                            EP{image.Id}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {expandedPosts[image.Id] && (
+                        <div className="mt-1 space-y-1 px-4 pb-4">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={newComment[image.Id] || ""}
+                              onChange={(e) => handleCommentChange(image.Id, e.target.value)}
+                              placeholder="Write a comment..."
+                              className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                            <button
+                              onClick={() => handleCommentSubmit({id: image.Id} as AIPost)}
+                              className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                            >
+                              <Send size={20} />
+                            </button>
+                          </div>
+                          
+                          <div className="mt-4 space-y-0">
+                            <div className="flex items-center justify-center py-8">
+                              <div className="text-center text-gray-500">
+                                <MessageSquare size={24} className="mx-auto mb-2" />
+                                <p className="text-sm">No comments yet</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
               </div>
             </>
+          ) : (
+            <div className="flex flex-col justify-center items-center h-64 text-gray-500">
+              <div className="text-center">
+                <div className="text-4xl mb-4">📚</div>
+                <h3 className="text-lg font-medium mb-2">No comics available</h3>
+                <p className="text-sm text-gray-400">There are no comics to display at the moment</p>
+              </div>
+            </div>
           )}
-        </div>
+        </>
       ) : (
         /* 推文内容 */
         <>
@@ -1112,6 +1182,8 @@ export default React.memo(SceneThreadFeed, (prevProps, nextProps) => {
     nextPostsLength: nextProps.posts.length,
     prevPage: prevProps.currentPage,
     nextPage: nextProps.currentPage,
+    prevSelectedComicEpisode: prevProps.selectedComicEpisode,
+    nextSelectedComicEpisode: nextProps.selectedComicEpisode,
     postsRefChanged: prevProps.posts !== nextProps.posts
   });
 
@@ -1123,14 +1195,18 @@ export default React.memo(SceneThreadFeed, (prevProps, nextProps) => {
   const pageChanged = prevProps.currentPage !== nextProps.currentPage;
   const loadingChanged = prevProps.loading !== nextProps.loading;
   
+  // 3. 检查selectedComicEpisode - 对于漫画切换很重要
+  const selectedComicEpisodeChanged = prevProps.selectedComicEpisode !== nextProps.selectedComicEpisode;
+  
   // 直接返回是否需要重新渲染
   // 只要有任何一个关键属性变化，就重新渲染
-  const shouldRerender = postsRefChanged || pageChanged || loadingChanged;
+  const shouldRerender = postsRefChanged || pageChanged || loadingChanged || selectedComicEpisodeChanged;
   
   if (shouldRerender) {
     console.log('🔄 SceneThreadFeed将重新渲染:', 
       postsRefChanged ? '因为posts数组变化' : 
       pageChanged ? '因为页码变化' : 
+      selectedComicEpisodeChanged ? '因为selectedComicEpisode变化' :
       '因为loading状态变化');
   }
   
