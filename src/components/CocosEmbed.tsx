@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -202,12 +203,28 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
+    // 监听页面可见性变化，当页面隐藏时发送静音操作
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        sendMessageToGame({
+          type: "SET_AUDIO",
+          data: {
+            action: "setAudio",
+            audio: "off"
+          }
+        });
+        console.log('React: 页面隐藏，向iframe发送静音指令');
+      }
+    };
+
     window.addEventListener('message', handleMessage);
     window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -290,6 +307,23 @@ export const GlobalIframe: React.FC = () => {
       globalSetIframeUrl = null;
     };
   }, []);
+  
+  // 监听iframe显示状态变化，当隐藏时发送静音操作
+  useEffect(() => {
+    if (!showIframe || position === 'hidden') {
+      // 当iframe隐藏时，向iframe发送静音操作
+      if (cocosContext && cocosContext.sendMessageToGame) {
+        cocosContext.sendMessageToGame({
+          type: "SET_AUDIO",
+          data: {
+            action: "setAudio",
+            audio: "off"
+          }
+        });
+        console.log('React: GlobalIframe隐藏，向iframe发送静音指令');
+      }
+    }
+  }, [showIframe, position, cocosContext]);
   
   return (
     <>
@@ -500,12 +534,28 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
       }
     };
 
+    // 监听页面可见性变化，当页面隐藏时发送静音操作
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        sendMessageToGame({
+          type: "SET_AUDIO",
+          data: {
+            action: "setAudio",
+            audio: "off"
+          }
+        });
+        console.log('React: CocosEmbed页面隐藏，向iframe发送静音指令');
+      }
+    };
+
     window.addEventListener('message', handleMessage);
     window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -537,6 +587,17 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
     return () => {
       clearTimeout(timer);
       window.removeEventListener('resize', handleResize);
+      
+      // 在组件卸载时向iframe发送静音操作
+      sendMessageToGame({
+        type: "SET_AUDIO",
+        data: {
+          action: "setAudio",
+          audio: "off"
+        }
+      });
+      console.log('React: Scene销毁或切换页面，向iframe发送静音指令');
+      
       setShowIframe(false);
       if (globalSetShowIframe) {
         globalSetShowIframe(false);

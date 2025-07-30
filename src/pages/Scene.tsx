@@ -239,6 +239,42 @@ const Scene: React.FC = () => {
     }
   }, []);
 
+  // Scene页面静音控制
+  useEffect(() => {
+    // 监听页面可见性变化，当页面隐藏时发送静音操作
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        sendMessageToGame({
+          type: "SET_AUDIO",
+          data: {
+            action: "setAudio",
+            audio: "off"
+          }
+        });
+        console.log('React: Scene页面隐藏，向iframe发送静音指令');
+      }
+    };
+
+    // 添加页面可见性监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 清理函数：组件卸载时发送静音操作
+    return () => {
+      // Scene页面卸载时向iframe发送静音操作
+      sendMessageToGame({
+        type: "SET_AUDIO",
+        data: {
+          action: "setAudio",
+          audio: "off"
+        }
+      });
+      console.log('React: Scene页面卸载，向iframe发送静音指令');
+
+      // 移除事件监听器
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [sendMessageToGame]);
+
   // 使用useRef保存当前页码，避免闭包问题
   const currentPageRef = React.useRef(currentPage);
   

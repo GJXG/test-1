@@ -1009,19 +1009,34 @@ const timeAgo = (timestamp: number) => {
             </div>
           ) : images && images.length > 0 ? (
             <>
-              {/* 显示选中ID的漫画 */}
+              {/* 按EP1到EP3的顺序合并显示漫画 */}
               <div className="space-y-0">
-                {images
-                  .filter(image => selectedComicEpisode === null || image.Id === selectedComicEpisode)
-                  .map(image => (
+                {/* 获取所有唯一的EP ID并按升序排序 */}
+                {(() => {
+                  const uniqueEpIds = [...new Set(images.map(image => image.Id))].sort((a, b) => a - b);
+                  
+                  return uniqueEpIds.map(epId => {
+                    // 获取当前EP的所有图片
+                    const epImages = images.filter(image => image.Id === epId);
+                    
+                    return (
+                      <div key={epId} className="mb-4">
+                        {/* EP标题 */}
+                        <div className="bg-gray-100 px-4 py-2 mb-2 rounded-t-lg">
+                          <h3 className="text-lg font-semibold text-gray-800">EP{epId}</h3>
+                        </div>
+                        
+                        {/* EP内的所有图片 */}
+                        <div className="space-y-0">
+                          {epImages.map((image, index) => (
                     <div
-                      key={image.Id}
+                              key={`${epId}-${index}`}
                       className="bg-white dark:bg-gray-800 transition hover:shadow-md"
                     >
                       <div className="overflow-hidden relative">
                         <img
                           src={image.ImgUrl}
-                          alt={`Comic panel ${image.Id}`}
+                                  alt={`Comic panel EP${epId} - ${index + 1}`}
                           className="w-full h-auto object-cover"
                           loading="lazy"
                         />
@@ -1059,7 +1074,7 @@ const timeAgo = (timestamp: number) => {
 
                           {/* Right side: Tag container */}
                           <div className="bg-white text-black px-2 py-1 rounded-md text-xs shadow-sm">
-                            EP{image.Id}
+                                    EP{epId} - {index + 1}
                           </div>
                         </div>
                       </div>
@@ -1094,6 +1109,11 @@ const timeAgo = (timestamp: number) => {
                       )}
                     </div>
                   ))}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </>
           ) : (
@@ -1182,8 +1202,6 @@ export default React.memo(SceneThreadFeed, (prevProps, nextProps) => {
     nextPostsLength: nextProps.posts.length,
     prevPage: prevProps.currentPage,
     nextPage: nextProps.currentPage,
-    prevSelectedComicEpisode: prevProps.selectedComicEpisode,
-    nextSelectedComicEpisode: nextProps.selectedComicEpisode,
     postsRefChanged: prevProps.posts !== nextProps.posts
   });
 
@@ -1195,18 +1213,14 @@ export default React.memo(SceneThreadFeed, (prevProps, nextProps) => {
   const pageChanged = prevProps.currentPage !== nextProps.currentPage;
   const loadingChanged = prevProps.loading !== nextProps.loading;
   
-  // 3. 检查selectedComicEpisode - 对于漫画切换很重要
-  const selectedComicEpisodeChanged = prevProps.selectedComicEpisode !== nextProps.selectedComicEpisode;
-  
   // 直接返回是否需要重新渲染
   // 只要有任何一个关键属性变化，就重新渲染
-  const shouldRerender = postsRefChanged || pageChanged || loadingChanged || selectedComicEpisodeChanged;
+  const shouldRerender = postsRefChanged || pageChanged || loadingChanged;
   
   if (shouldRerender) {
     console.log('🔄 SceneThreadFeed将重新渲染:', 
       postsRefChanged ? '因为posts数组变化' : 
       pageChanged ? '因为页码变化' : 
-      selectedComicEpisodeChanged ? '因为selectedComicEpisode变化' :
       '因为loading状态变化');
   }
   

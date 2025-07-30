@@ -112,29 +112,19 @@ const BuildDrama: React.FC = () => {
   const [isUserInfoFolded, setIsUserInfoFolded] = useState(false);
   const [npcSwitchLoading, setNpcSwitchLoading] = useState(false);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
-  const [showEpisodeList, setShowEpisodeList] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<number | null>(null);
-  const [selectedComicEpisode, setSelectedComicEpisode] = useState<number | null>(1); // 添加控制漫画EP的状态变量，默认值为1
   const [epListData, setEpListData] = useState<EpListItem[]>([]);
   const [epListLoading, setEpListLoading] = useState<boolean>(true);
-  const [hasAutoSelectedComicEpisode, setHasAutoSelectedComicEpisode] = useState<boolean>(false); // 添加状态跟踪是否已经自动选择了EP
 
   // 获取漫画数据
   const { images: comicImages, isLoading: comicImagesLoading, error: comicImagesError } = useGeneratedImages();
 
-  // 当漫画数据加载完成时，自动选择最大的EP
+  // 漫画数据加载完成时的处理
   React.useEffect(() => {
-    if (comicImages && comicImages.length > 0 && selectedComicEpisode === 1 && !hasAutoSelectedComicEpisode) {
-      // 获取所有唯一的EP ID并按降序排序
-      const uniqueIds = [...new Set(comicImages.map(image => image.Id))];
-      const sortedIds = uniqueIds.sort((a, b) => b - a);
-      // 选择最大的EP ID
-      if (sortedIds.length > 0) {
-        setSelectedComicEpisode(sortedIds[0]);
-        setHasAutoSelectedComicEpisode(true); // 标记已经自动选择了EP
-      }
+    if (comicImages && comicImages.length > 0) {
+      console.log(`[BuildDrama] 漫画数据加载完成，共${comicImages.length}张图片`);
     }
-  }, [comicImages, selectedComicEpisode, hasAutoSelectedComicEpisode]);
+  }, [comicImages]);
 
   // Check login status on component mount
   useEffect(() => {
@@ -717,7 +707,6 @@ const BuildDrama: React.FC = () => {
   const handleSelectEpisode = React.useCallback((episodeNumber: number) => {
     console.log(`[BuildDrama] 选择EP: ${episodeNumber}`);
     setSelectedEpisode(episodeNumber);
-    setShowEpisodeList(false); // 选择后自动折叠列表
   }, []);
 
   // 处理EP列表响应
@@ -799,6 +788,42 @@ const BuildDrama: React.FC = () => {
     });
   }, []); // 移除sendMessageToGame依赖，避免重复发送
 
+  // BuildDrama页面静音控制
+  useEffect(() => {
+    // 监听页面可见性变化，当页面隐藏时发送静音操作
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        sendMessageToGame({
+          type: "SET_AUDIO",
+          data: {
+            action: "setAudio",
+            audio: "off"
+          }
+        });
+        console.log('React: BuildDrama页面隐藏，向iframe发送静音指令');
+      }
+    };
+
+    // 添加页面可见性监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 清理函数：组件卸载时发送静音操作
+    return () => {
+      // BuildDrama页面卸载时向iframe发送静音操作
+      sendMessageToGame({
+        type: "SET_AUDIO",
+        data: {
+          action: "setAudio",
+          audio: "off"
+        }
+      });
+      console.log('React: BuildDrama页面卸载，向iframe发送静音指令');
+
+      // 移除事件监听器
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [sendMessageToGame]);
+
   // 使用useMemo缓存过滤后的结果
   const filteredPosts = React.useMemo(() => {
     return aiPosts;
@@ -870,101 +895,14 @@ const BuildDrama: React.FC = () => {
                       alt="Build Drama Banner"
                       className="w-full h-full object-cover"
                     />
-                    {/* 右下角按钮 */}
-                    <button
-                      onClick={() => setShowEpisodeList(!showEpisodeList)}
-                      className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/80 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200"
-                    >
-                      {showEpisodeList ? 'fold' : selectedComicEpisode ? `EP${selectedComicEpisode}` : 'Select EP'}
-                    </button>
+                    {/* 右下角按钮 - 显示漫画信息 */}
+                    <div className="absolute bottom-2 right-2 bg-black/70 text-white px-3 py-1.5 rounded-md text-sm font-medium">
+                      {comicImagesLoading ? 'Loading...' : comicImages && comicImages.length > 0 ? 'Comics' : 'No Comics'}
                   </div>
                 </div>
-                
-                {/* Episode 列表 - 只在showEpisodeList为true时显示 */}
-                <div 
-                  className={`w-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden transition-all duration-300 ease-in-out ${
-                    showEpisodeList 
-                      ? 'max-h-40 opacity-100' 
-                      : 'max-h-0 opacity-0'
-                  }`}
-                >
-                  <div className="h-32 overflow-y-auto p-4">
-                    {/* 漫画选择按钮 */}
-                    <div className="grid grid-cols-5 gap-3 mb-4">
-                      {comicImagesLoading ? (
-                        <div className="col-span-5 flex items-center justify-center">
-                          <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mr-2"></div>
-                          <span className="text-sm text-gray-500">Loading comics...</span>
-                        </div>
-                      ) : comicImagesError ? (
-                        <div className="col-span-5 text-center text-sm text-red-500">
-                          Error loading comics: {comicImagesError}
-                        </div>
-                      ) : comicImages && comicImages.length > 0 ? (
-                        // 根据漫画数据动态生成按钮，按ID降序排序
-                        [...new Set(comicImages.map(image => image.Id))]
-                          .sort((a, b) => b - a) // 从大到小排序
-                          .map((id) => {
-                            const isSelected = selectedComicEpisode === id;
-                            return (
-                              <button
-                                key={id}
-                                className={`font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm ${
-                                  isSelected
-                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                                }`}
-                                onClick={() => setSelectedComicEpisode(id)}
-                              >
-                                {id === 1 ? 'EP1' : `EP${id}`}
-                              </button>
-                            );
-                          })
-                      ) : (
-                        <div className="col-span-5 text-center text-sm text-gray-500">
-                          No comics available
-                        </div>
-                      )}
                     </div>
                     
-                    {/* 分隔线 */}
-                    {/* <div className="border-t border-gray-200 my-3"></div> */}
-                    
-                    {/* 原有的EP选择按钮 */}
-                    {/* <div className="grid grid-cols-5 gap-3">
-                      {epListLoading ? (
-                        <div className="col-span-5 flex items-center justify-center">
-                          <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mr-2"></div>
-                          <span className="text-sm text-gray-500">Loading EP list...</span>
-                        </div>
-                      ) : getCurrentSceneEpList.length > 0 ? (
-                        getCurrentSceneEpList.map((ep) => {
-                          const episodeNumber = parseInt(ep.replace('EP', ''));
-                          const isSelected = selectedEpisode === episodeNumber;
-                          return (
-                            <button
-                              key={ep}
-                              className={`font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm ${
-                                isSelected
-                                  ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                              }`}
-                              onClick={() => handleSelectEpisode(episodeNumber)}
-                            >
-                              {ep}
-                            </button>
-                          );
-                        })
-                      )
-                       : (
-                        <div className="col-span-5 text-center text-sm text-gray-500">
-                          No episodes available for this scene
-                        </div>
-                      )
-                      }
-                    </div> */}
-                  </div>
-                </div>
+                {/* 移除EP选择功能，因为现在会按顺序显示所有EP的漫画 */}
                 
                 {/* Thread Feed */}
                 <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
@@ -979,7 +917,7 @@ const BuildDrama: React.FC = () => {
                   currentPage={currentPage}
                   onPageChange={handlePageChange}
                   selectedEpisode={selectedEpisode}
-                  selectedComicEpisode={selectedComicEpisode} // 传递漫画EP状态变量
+                  selectedComicEpisode={null} // 不再需要选择特定EP，显示所有EP
                   showManga={true} // 在BuildDrama页面显示漫画
                 />
                 </div>
