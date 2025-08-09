@@ -776,7 +776,7 @@ const BuildDrama: React.FC = () => {
     }, 1000);
   }, [navigate]);
 
-  // 在组件挂载时向iframe发送消息
+  // 在组件挂载时向iframe发送消息，只发送postMessage不改变URL
   useEffect(() => {
     // 发送包含action和target参数的消息
     sendMessageToGame({
@@ -786,13 +786,19 @@ const BuildDrama: React.FC = () => {
         target: "Custom"
       }
     });
+    console.log('BuildDrama: 只发送postMessage，不切换iframe URL');
   }, []); // 移除sendMessageToGame依赖，避免重复发送
 
-  // BuildDrama页面静音控制
+  // BuildDrama页面静音控制（防重复发送）
   useEffect(() => {
+    let lastVisibilityState = !document.hidden;
+    
     // 监听页面可见性变化，当页面隐藏时发送静音操作
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      const currentHidden = document.hidden;
+      
+      // 只在页面从可见变为隐藏时发送一次静音指令
+      if (currentHidden && !lastVisibilityState) {
         sendMessageToGame({
           type: "SET_AUDIO",
           data: {
@@ -800,25 +806,18 @@ const BuildDrama: React.FC = () => {
             audio: "off"
           }
         });
-        console.log('React: BuildDrama页面隐藏，向iframe发送静音指令');
+        console.log('React: BuildDrama页面变为隐藏，发送静音指令');
       }
+      
+      lastVisibilityState = currentHidden;
     };
 
     // 添加页面可见性监听
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 清理函数：组件卸载时发送静音操作
+    // 清理函数：组件卸载时不发送静音操作，由GlobalIframe统一处理
     return () => {
-      // BuildDrama页面卸载时向iframe发送静音操作
-      sendMessageToGame({
-        type: "SET_AUDIO",
-        data: {
-          action: "setAudio",
-          audio: "off"
-        }
-      });
-      console.log('React: BuildDrama页面卸载，向iframe发送静音指令');
-
+      console.log('React: BuildDrama页面卸载');
       // 移除事件监听器
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -875,7 +874,7 @@ const BuildDrama: React.FC = () => {
                 <CocosEmbed 
                   sceneId={gameSceneId} 
                   className="w-full h-full" 
-                  iframeUrl="https://dramai.world/webframe" 
+                  // 移除iframeUrl属性，使用全局默认URL
                 />
               </div>
             </div>

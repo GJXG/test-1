@@ -203,9 +203,14 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
-    // 监听页面可见性变化，当页面隐藏时发送静音操作
+    // 监听页面可见性变化，当页面隐藏时发送静音操作（防重复发送）
+    let lastVisibilityState = !document.hidden;
+    
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      const currentHidden = document.hidden;
+      
+      // 只在页面从可见变为隐藏时发送一次静音指令
+      if (currentHidden && !lastVisibilityState) {
         sendMessageToGame({
           type: "SET_AUDIO",
           data: {
@@ -213,8 +218,10 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             audio: "off"
           }
         });
-        console.log('React: 页面隐藏，向iframe发送静音指令');
+        console.log('React: 页面变为隐藏，发送静音指令');
       }
+      
+      lastVisibilityState = currentHidden;
     };
 
     window.addEventListener('message', handleMessage);
@@ -251,8 +258,20 @@ export const GlobalIframe: React.FC = () => {
   const [showIframe, setShowIframe] = useState(false);
   const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
   const [isMuted, setIsMuted] = useState(false);
-  const [iframeUrl, setIframeUrl] = useState('https://dramai.world/webframe/'); // 默认URL
+  // 固定iframe URL，不再允许更改
+  const iframeUrl = 'https://dramai.world/webframe/';
   const cocosContext = useCocos();
+  
+  // 确保iframe在应用启动时就开始加载
+  useEffect(() => {
+    console.log('GlobalIframe: 开始加载iframe，URL:', iframeUrl);
+    if (iframeRef.current) {
+      // 确保iframe有src
+      if (!iframeRef.current.src) {
+        iframeRef.current.src = iframeUrl;
+      }
+    }
+  }, [iframeUrl]);
   
   // 初始化时从localStorage读取静音状态
   useEffect(() => {
@@ -299,19 +318,24 @@ export const GlobalIframe: React.FC = () => {
     globalSetShowIframe = setShowIframe;
     globalSetPosition = setPosition;
     globalSetIsMuted = setIsMuted;
-    globalSetIframeUrl = setIframeUrl; // 设置iframe URL更新函数
+    // 移除iframe URL更新函数，不再允许更改URL
+    // globalSetIframeUrl = setIframeUrl;
     return () => {
       globalSetShowIframe = null;
       globalSetPosition = null;
       globalSetIsMuted = null;
-      globalSetIframeUrl = null;
+      // globalSetIframeUrl = null;
     };
   }, []);
   
-  // 监听iframe显示状态变化，当隐藏时发送静音操作
+  // 监听iframe显示状态变化，当隐藏时发送静音操作（只在状态变化时发送一次）
+  const [lastMuteState, setLastMuteState] = useState<'hidden' | 'visible'>('visible');
+  
   useEffect(() => {
-    if (!showIframe || position === 'hidden') {
-      // 当iframe隐藏时，向iframe发送静音操作
+    const currentState = (!showIframe || position === 'hidden') ? 'hidden' : 'visible';
+    
+    // 只在状态从可见变为隐藏时发送一次静音指令
+    if (currentState === 'hidden' && lastMuteState === 'visible') {
       if (cocosContext && cocosContext.sendMessageToGame) {
         cocosContext.sendMessageToGame({
           type: "SET_AUDIO",
@@ -320,10 +344,12 @@ export const GlobalIframe: React.FC = () => {
             audio: "off"
           }
         });
-        console.log('React: GlobalIframe隐藏，向iframe发送静音指令');
+        console.log('React: GlobalIframe状态变为隐藏，发送静音指令');
       }
     }
-  }, [showIframe, position, cocosContext]);
+    
+    setLastMuteState(currentState);
+  }, [showIframe, position, cocosContext, lastMuteState]);
   
   return (
     <>
@@ -332,20 +358,22 @@ export const GlobalIframe: React.FC = () => {
         ref={iframeRef}
         src={iframeUrl}
         className={
-          position === 'hidden' 
-            ? "fixed top-0 left-0 w-0 h-0 opacity-0 pointer-events-none border-0"
-            : `fixed inset-0 w-full h-full border-0 transition-opacity duration-500 z-[999] ${
-          showIframe ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          position === 'hidden'
+            ? "fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none border-0"
+            : `fixed border-0 transition-opacity duration-500 z-[999] ${
+                showIframe ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`
         }
-        style={{ 
+        style={{
+          // 由 CocosEmbed.positionIframeToContainer 负责 left/top/width/height
           zIndex: position === 'hidden' ? -1 : 999,
           borderRadius: position === 'container' ? '8px' : '0'
         }}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         referrerPolicy="no-referrer"
         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-        loading="lazy"
+        // 取消 lazy，避免进入页面时不加载导致黑屏
+        loading="eager"
         title={position === 'hidden' ? "Game Embed Preloader" : "Game Embed"}
       />
       
@@ -449,7 +477,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
     }
   };
 
-  // 添加导航函数
+  // 添加导航函数 - 只发送postMessage，不切换URL
   const navigateToScene = (target: string) => {
     sendMessageToGame({
       type: "SEND_CUSTOM_EVENT",
@@ -458,24 +486,24 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
         target: target
       }
     });
-    console.log(`Navigating to scene: ${target}`);
+    console.log(`Navigating to scene: ${target} (only sending postMessage, not changing URL)`);
   };
 
-  // 定位iframe到容器
+  // 定位iframe到容器（进入页面立即定位，避免黑屏）
   const positionIframeToContainer = () => {
-    if (containerRef.current && iframeRef.current) {
-      const container = containerRef.current;
-      const rect = container.getBoundingClientRect();
-      
-      const iframe = iframeRef.current;
-      iframe.style.position = 'fixed';
-      iframe.style.left = `${rect.left}px`;
-      iframe.style.top = `${rect.top}px`;
-      iframe.style.width = `${rect.width}px`;
-      iframe.style.height = `${rect.height}px`;
-      iframe.style.zIndex = '1000';
-      iframe.style.borderRadius = '8px';
-    }
+    if (!containerRef.current || !iframeRef.current) return;
+
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+
+    const iframe = iframeRef.current;
+    iframe.style.position = 'fixed';
+    iframe.style.left = `${rect.left}px`;
+    iframe.style.top = `${rect.top}px`;
+    iframe.style.width = `${rect.width}px`;
+    iframe.style.height = `${rect.height}px`;
+    iframe.style.zIndex = '1000';
+    iframe.style.borderRadius = '8px';
   };
 
   useEffect(() => {
@@ -534,9 +562,14 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
       }
     };
 
-    // 监听页面可见性变化，当页面隐藏时发送静音操作
+    // 监听页面可见性变化，当页面隐藏时发送静音操作（防重复发送）
+    let lastVisibilityState = !document.hidden;
+    
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      const currentHidden = document.hidden;
+      
+      // 只在页面从可见变为隐藏时发送一次静音指令
+      if (currentHidden && !lastVisibilityState) {
         sendMessageToGame({
           type: "SET_AUDIO",
           data: {
@@ -544,8 +577,10 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
             audio: "off"
           }
         });
-        console.log('React: CocosEmbed页面隐藏，向iframe发送静音指令');
+        console.log('React: CocosEmbed页面变为隐藏，发送静音指令');
       }
+      
+      lastVisibilityState = currentHidden;
     };
 
     window.addEventListener('message', handleMessage);
@@ -561,26 +596,23 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
 
   // 组件挂载时显示iframe并定位到容器
   useEffect(() => {
-    // 如果提供了自定义iframe URL，则更新全局iframe URL
-    if (iframeUrl && globalSetIframeUrl) {
+    // 不再更新iframe URL，保持单一URL
+    // 注释掉URL更新代码，只使用初始URL
+    /* if (iframeUrl && globalSetIframeUrl) {
       globalSetIframeUrl(iframeUrl);
-    }
+    } */
     
+    // 先立即定位一次，减少黑屏窗口
+    positionIframeToContainer();
     const timer = setTimeout(() => {
       setShowIframe(true);
-      if (globalSetShowIframe) {
-        globalSetShowIframe(true);
-      }
-      if (globalSetPosition) {
-        globalSetPosition('container');
-      }
+      globalSetShowIframe?.(true);
+      globalSetPosition?.('container');
       positionIframeToContainer();
-    }, 1000);
+    }, 200);
     
     // 监听窗口大小变化，重新定位iframe
-    const handleResize = () => {
-      positionIframeToContainer();
-    };
+    const handleResize = () => positionIframeToContainer();
     
     window.addEventListener('resize', handleResize);
     
@@ -588,15 +620,9 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
       clearTimeout(timer);
       window.removeEventListener('resize', handleResize);
       
-      // 在组件卸载时向iframe发送静音操作
-      sendMessageToGame({
-        type: "SET_AUDIO",
-        data: {
-          action: "setAudio",
-          audio: "off"
-        }
-      });
-      console.log('React: Scene销毁或切换页面，向iframe发送静音指令');
+      // 在组件卸载时向iframe发送静音操作（只在真正卸载时发送）
+      // 注意：这里不发送静音指令，因为GlobalIframe的状态监听会处理
+      console.log('React: CocosEmbed组件卸载');
       
       setShowIframe(false);
       if (globalSetShowIframe) {

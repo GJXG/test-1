@@ -88,6 +88,7 @@ const App: React.FC = () => {
   return (
     <>
       <CocosProvider>
+        <GlobalIframe/>
         <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
@@ -99,7 +100,6 @@ const App: React.FC = () => {
             </TooltipProvider>
           </QueryClientProvider>
         </GoogleOAuthProvider>
-        <GlobalIframe/>
       </CocosProvider>
     </>
   );

@@ -10,9 +10,36 @@ const LoadingScreen: React.FC = () => {
 
   // Ensure iframe is loaded
   useEffect(() => {
-    // If iframe source is not set, set it
-    if (iframeRef.current && !iframeRef.current.src) {
-      iframeRef.current.src = "https://dramai.world/webframe/";
+    console.log('LoadingScreen: 检查iframe状态');
+    
+    const ensureIframeLoaded = () => {
+      if (iframeRef.current) {
+        if (!iframeRef.current.src) {
+          console.log('LoadingScreen: 设置iframe src');
+          iframeRef.current.src = "https://dramai.world/webframe/";
+        } else {
+          console.log('LoadingScreen: iframe src已存在:', iframeRef.current.src);
+        }
+        return true; // iframe已找到并处理
+      } else {
+        console.log('LoadingScreen: iframeRef.current 不存在，等待GlobalIframe挂载');
+        return false; // iframe还未挂载
+      }
+    };
+    
+    // 立即尝试一次
+    if (!ensureIframeLoaded()) {
+      // 如果iframe还没挂载，每100ms检查一次，最多检查50次（5秒）
+      const checkInterval = setInterval(() => {
+        if (ensureIframeLoaded()) {
+          clearInterval(checkInterval);
+        }
+      }, 100);
+      
+      // 5秒后停止检查
+      setTimeout(() => {
+        clearInterval(checkInterval);
+      }, 5000);
     }
   }, []);
 

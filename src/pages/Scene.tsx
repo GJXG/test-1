@@ -239,11 +239,16 @@ const Scene: React.FC = () => {
     }
   }, []);
 
-  // Scene页面静音控制
+  // Scene页面静音控制（防重复发送）
   useEffect(() => {
+    let lastVisibilityState = !document.hidden;
+    
     // 监听页面可见性变化，当页面隐藏时发送静音操作
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      const currentHidden = document.hidden;
+      
+      // 只在页面从可见变为隐藏时发送一次静音指令
+      if (currentHidden && !lastVisibilityState) {
         sendMessageToGame({
           type: "SET_AUDIO",
           data: {
@@ -251,25 +256,18 @@ const Scene: React.FC = () => {
             audio: "off"
           }
         });
-        console.log('React: Scene页面隐藏，向iframe发送静音指令');
+        console.log('React: Scene页面变为隐藏，发送静音指令');
       }
+      
+      lastVisibilityState = currentHidden;
     };
 
     // 添加页面可见性监听
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 清理函数：组件卸载时发送静音操作
+    // 清理函数：组件卸载时不发送静音操作，由GlobalIframe统一处理
     return () => {
-      // Scene页面卸载时向iframe发送静音操作
-      sendMessageToGame({
-        type: "SET_AUDIO",
-        data: {
-          action: "setAudio",
-          audio: "off"
-        }
-      });
-      console.log('React: Scene页面卸载，向iframe发送静音指令');
-
+      console.log('React: Scene页面卸载');
       // 移除事件监听器
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -949,8 +947,9 @@ const Scene: React.FC = () => {
       targetSceneId = '3';  // 偶像场景
     }
     
-    // 更新 URL 并导航到新场景
+    // 只更新 URL，然后发送postMessage
     navigate(`/scene?sceneId=${targetSceneId}`);
+    // 只发送postMessage，不切换iframe URL
     navigateToScene(targetSceneId);
   };
 
@@ -1315,7 +1314,7 @@ const Scene: React.FC = () => {
         }, 2000);
       }
       
-      // 通知游戏引擎场景切换
+      // 只发送postMessage通知游戏引擎场景切换，不切换iframe URL
       navigateToScene(newRoomId);
       
       // 显示切换提示
