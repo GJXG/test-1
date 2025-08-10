@@ -1459,6 +1459,14 @@ const Scene: React.FC = () => {
       }
     }
     
+    // 等待3秒后发送消息
+    const delayTimer = setTimeout(() => {
+      if (!messageSent) {
+        console.log(`Scene: 等待3秒后开始发送postMessage，场景ID: ${gameSceneId}`);
+        sendMessage();
+      }
+    }, 3000);
+
     // 同时启动轮询检查作为备用方案
     const pollTimer = setTimeout(() => {
       if (!messageSent) {
@@ -1473,6 +1481,7 @@ const Scene: React.FC = () => {
         clearTimeout(retryTimer);
         retryTimer = null;
       }
+      clearTimeout(delayTimer);
       clearTimeout(pollTimer);
       
       if (iframeRef.current) {

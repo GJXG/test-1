@@ -862,26 +862,35 @@ const BuildDrama: React.FC = () => {
       }
     }
     
-    // 同时启动轮询检查作为备用方案
-    const pollTimer = setTimeout(() => {
-      if (!messageSent) {
-        console.log('BuildDrama: 启动备用轮询检查方案');
-        sendMessageWhenReady();
-      }
-    }, 200);
+             // 等待3秒后发送消息
+         const delayTimer = setTimeout(() => {
+           if (!messageSent) {
+             console.log('BuildDrama: 等待3秒后开始发送postMessage');
+             sendMessage();
+           }
+         }, 3000);
+
+         // 同时启动轮询检查作为备用方案
+         const pollTimer = setTimeout(() => {
+           if (!messageSent) {
+             console.log('BuildDrama: 启动备用轮询检查方案');
+             sendMessageWhenReady();
+           }
+         }, 200);
     
-    // 清理函数：清除可能还在运行的定时器和事件监听
-    return () => {
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-        retryTimer = null;
-      }
-      clearTimeout(pollTimer);
-      
-      if (iframeRef.current) {
-        iframeRef.current.removeEventListener('load', handleIframeLoad);
-      }
-    };
+             // 清理函数：清除可能还在运行的定时器和事件监听
+         return () => {
+           if (retryTimer) {
+             clearTimeout(retryTimer);
+             retryTimer = null;
+           }
+           clearTimeout(delayTimer);
+           clearTimeout(pollTimer);
+
+           if (iframeRef.current) {
+             iframeRef.current.removeEventListener('load', handleIframeLoad);
+           }
+         };
   }, []); // 移除sendMessageToGame依赖，避免重复发送
 
   // BuildDrama页面静音控制（防重复发送）
