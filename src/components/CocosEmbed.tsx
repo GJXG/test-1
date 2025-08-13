@@ -14,7 +14,6 @@ interface CocosContextType {
   isMuted: boolean;
   toggleMute: () => void;
   sendUserEmail: (email: string, loginType?: number) => void;
-  isIframeReady: boolean; // iframe 准备状态
 }
 
 export const CocosContext = createContext<CocosContextType | null>(null);
@@ -57,8 +56,7 @@ export const useCocos = () => {
       navigateToScene: () => {},
       isMuted: false,
       toggleMute: () => {},
-      sendUserEmail: () => {},
-      isIframeReady: false
+      sendUserEmail: () => {}
     } as CocosContextType;
   }
   return context;
@@ -248,8 +246,7 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       navigateToScene,
       isMuted,
       toggleMute,
-      sendUserEmail,
-      isIframeReady: isConnected // 使用连接状态作为iframe准备状态
+      sendUserEmail
     }}>
       {children}
     </CocosContext.Provider>
@@ -663,8 +660,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
       navigateToScene,
       isMuted,
       toggleMute,
-      sendUserEmail,
-      isIframeReady: isConnected // 使用连接状态作为iframe准备状态
+      sendUserEmail
     }}>
       <div 
         ref={containerRef}
