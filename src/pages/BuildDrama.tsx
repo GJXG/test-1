@@ -137,6 +137,60 @@ const BuildDrama: React.FC = () => {
     }
   }, []);
 
+  // 监听iframe消息
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // 检查消息来源是否可信
+      // if (event.origin !== "期望的origin") return;
+      
+      if (event.data.type === 'GAME_LOADED') {
+        console.log('🎮 [BuildDrama] 收到iframe的GAME_LOADED消息:', event.data);
+        
+        // 游戏加载完成后，发送场景切换消息到偶像场景
+        const targetGameSceneId = gameSceneId; // 固定使用偶像场景ID=3
+        if (targetGameSceneId) {
+          // 发送与BuildDrama页面一致的场景切换消息
+          sendMessageToGame({
+            type: "SEND_CUSTOM_EVENT",
+            data: {
+              action: "navigate",
+              target: "Custom"
+            }
+          });
+          console.log('🎮 [BuildDrama] 游戏加载完成，发送场景切换消息到iframe:', { 
+            sceneId: effectiveSceneId, 
+            gameSceneId: targetGameSceneId 
+          });
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [gameSceneId, effectiveSceneId, sendMessageToGame]);
+
+  // 页面加载时主动发送场景切换消息
+  useEffect(() => {
+    const targetGameSceneId = gameSceneId; // 固定使用偶像场景ID=3
+    if (targetGameSceneId) {
+      // 主动发送场景切换消息
+      sendMessageToGame({
+        type: "SEND_CUSTOM_EVENT",
+        data: {
+          action: "navigate",
+          target: "Custom"
+        }
+      });
+      console.log('🎮 [BuildDrama] 页面加载，主动发送场景切换消息到iframe:', { 
+        sceneId: effectiveSceneId, 
+        gameSceneId: targetGameSceneId 
+      });
+    }
+  }, [gameSceneId, effectiveSceneId, sendMessageToGame]);
+
   // 使用useRef保存当前页码，避免闭包问题
   const currentPageRef = React.useRef(currentPage);
   
