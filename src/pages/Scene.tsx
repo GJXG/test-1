@@ -219,7 +219,7 @@ const Scene: React.FC = () => {
   const [votesLoading, setVotesLoading] = useState<boolean>(true);
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const { sendMessageToGame, navigateToScene } = useCocos();
+  const { sendMessageToGame, navigateToScene, isConnected } = useCocos();
   const [isUserInfoFolded, setIsUserInfoFolded] = useState(false);
   const [npcSwitchLoading, setNpcSwitchLoading] = useState(false); // 添加NPC切换加载状态
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false); // 添加Header折叠状态
@@ -239,59 +239,27 @@ const Scene: React.FC = () => {
     }
   }, []);
 
-  // 监听iframe消息
+  // 记录已发送过的场景，避免重复发送
+  const lastSentSceneIdRef = React.useRef<string | null>(null);
+
+  // 当游戏已连接且gameSceneId有效时，去重发送场景切换消息
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // 检查消息来源是否可信
-      // if (event.origin !== "期望的origin") return;
-      
-      if (event.data.type === 'GAME_LOADED') {
-        console.log('🎮 收到iframe的GAME_LOADED消息:', event.data);
-        
-        // 游戏加载完成后，发送场景切换消息
-        const targetGameSceneId = getGameSceneId(sceneId);
-        if (targetGameSceneId && targetGameSceneId !== 'MainMenu') {
-          // 发送与BuildDrama页面一致的场景切换消息
-          sendMessageToGame({
-            type: "SEND_CUSTOM_EVENT",
-            data: {
-              action: "navigate",
-              target: targetGameSceneId
-            }
-          });
-          console.log('🎮 游戏加载完成，发送场景切换消息到iframe:', { 
-            sceneId: sceneId, 
-            gameSceneId: targetGameSceneId 
-          });
-        }
+    if (!isConnected) return;
+    if (!gameSceneId || gameSceneId === 'MainMenu') return;
+    if (lastSentSceneIdRef.current === gameSceneId) return;
+
+    sendMessageToGame({
+      type: "SEND_CUSTOM_EVENT",
+      data: {
+        action: "navigate",
+        target: gameSceneId
       }
-    };
+    });
+    console.log('🎮 Scene页面：发送场景切换消息到iframe（去重）:', { sceneId, gameSceneId });
+    lastSentSceneIdRef.current = gameSceneId;
+  }, [isConnected, gameSceneId, sendMessageToGame, sceneId]);
 
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [sceneId, sendMessageToGame]);
-
-  // 页面加载时主动发送场景切换消息
-  useEffect(() => {
-    const targetGameSceneId = getGameSceneId(sceneId);
-    if (targetGameSceneId && targetGameSceneId !== 'MainMenu') {
-      // 主动发送场景切换消息
-      sendMessageToGame({
-        type: "SEND_CUSTOM_EVENT",
-        data: {
-          action: "navigate",
-          target: targetGameSceneId
-        }
-      });
-      console.log('🎮 Scene页面加载，主动发送场景切换消息到iframe:', { 
-        sceneId: sceneId, 
-        gameSceneId: targetGameSceneId 
-      });
-    }
-  }, [sceneId, sendMessageToGame]);
+  // （移除主动发送逻辑，改为在连接完成后统一去重发送）
 
   // Scene页面静音控制（防重复发送）
   useEffect(() => {

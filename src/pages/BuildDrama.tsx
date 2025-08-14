@@ -108,7 +108,7 @@ const BuildDrama: React.FC = () => {
   const [votesLoading, setVotesLoading] = useState<boolean>(true);
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const { sendMessageToGame, navigateToScene } = useCocos();
+  const { sendMessageToGame, navigateToScene, isConnected } = useCocos();
   const [isUserInfoFolded, setIsUserInfoFolded] = useState(false);
   const [npcSwitchLoading, setNpcSwitchLoading] = useState(false);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
@@ -137,59 +137,26 @@ const BuildDrama: React.FC = () => {
     }
   }, []);
 
-  // 监听iframe消息
+  // 记录已发送过的场景，避免重复发送
+  const lastSentSceneIdRef = React.useRef<string | null>(null);
+
+  // 当游戏已连接时，去重发送场景切换消息到Custom场景
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // 检查消息来源是否可信
-      // if (event.origin !== "期望的origin") return;
-      
-      if (event.data.type === 'GAME_LOADED') {
-        console.log('🎮 [BuildDrama] 收到iframe的GAME_LOADED消息:', event.data);
-        
-        // 游戏加载完成后，发送场景切换消息到偶像场景
-        const targetGameSceneId = gameSceneId; // 固定使用偶像场景ID=3
-        if (targetGameSceneId) {
-          // 发送与BuildDrama页面一致的场景切换消息
-          sendMessageToGame({
-            type: "SEND_CUSTOM_EVENT",
-            data: {
-              action: "navigate",
-              target: "Custom"
-            }
-          });
-          console.log('🎮 [BuildDrama] 游戏加载完成，发送场景切换消息到iframe:', { 
-            sceneId: effectiveSceneId, 
-            gameSceneId: targetGameSceneId 
-          });
-        }
+    if (!isConnected) return;
+    if (lastSentSceneIdRef.current === "Custom") return;
+
+    sendMessageToGame({
+      type: "SEND_CUSTOM_EVENT",
+      data: {
+        action: "navigate",
+        target: "Custom"
       }
-    };
+    });
+    console.log('🎮 [BuildDrama] 发送场景切换消息到iframe（去重）:', { effectiveSceneId, target: "Custom" });
+    lastSentSceneIdRef.current = "Custom";
+  }, [isConnected, sendMessageToGame, effectiveSceneId]);
 
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [gameSceneId, effectiveSceneId, sendMessageToGame]);
-
-  // 页面加载时主动发送场景切换消息
-  useEffect(() => {
-    const targetGameSceneId = gameSceneId; // 固定使用偶像场景ID=3
-    if (targetGameSceneId) {
-      // 主动发送场景切换消息
-      sendMessageToGame({
-        type: "SEND_CUSTOM_EVENT",
-        data: {
-          action: "navigate",
-          target: "Custom"
-        }
-      });
-      console.log('🎮 [BuildDrama] 页面加载，主动发送场景切换消息到iframe:', { 
-        sceneId: effectiveSceneId, 
-        gameSceneId: targetGameSceneId 
-      });
-    }
-  }, [gameSceneId, effectiveSceneId, sendMessageToGame]);
+  // （移除主动发送逻辑，改为在连接完成后统一去重发送）
 
   // 使用useRef保存当前页码，避免闭包问题
   const currentPageRef = React.useRef(currentPage);
@@ -830,18 +797,7 @@ const BuildDrama: React.FC = () => {
     }, 1000);
   }, [navigate]);
 
-  // 在组件挂载时向iframe发送消息，只发送postMessage不改变URL
-  useEffect(() => {
-    // 发送包含action和target参数的消息
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "navigate",
-        target: "Custom"
-      }
-    });
-    console.log('BuildDrama: 只发送postMessage，不切换iframe URL');
-  }, []); // 移除sendMessageToGame依赖，避免重复发送
+  // （移除组件挂载时的重复发送，改为在连接完成后统一去重发送）
 
   // BuildDrama页面静音控制（防重复发送）
   useEffect(() => {
