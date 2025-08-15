@@ -797,7 +797,18 @@ const BuildDrama: React.FC = () => {
     }, 1000);
   }, [navigate]);
 
-  // （移除组件挂载时的重复发送，改为在连接完成后统一去重发送）
+  // 在组件挂载时向iframe发送消息，只发送postMessage不改变URL
+  useEffect(() => {
+    // 发送包含action和target参数的消息
+    sendMessageToGame({
+      type: "SEND_CUSTOM_EVENT",
+      data: {
+        action: "navigate",
+        target: "Custom"
+      }
+    });
+    console.log('BuildDrama: 只发送postMessage，不切换iframe URL');
+  }, []); // 移除sendMessageToGame依赖，避免重复发送
 
   // BuildDrama页面静音控制（防重复发送）
   useEffect(() => {
