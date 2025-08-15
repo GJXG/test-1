@@ -137,27 +137,6 @@ const BuildDrama: React.FC = () => {
     }
   }, []);
 
-  // 记录已发送过的场景，避免重复发送
-  const lastSentSceneIdRef = React.useRef<string | null>(null);
-
-  // 当游戏已连接时，去重发送场景切换消息到Custom场景
-  useEffect(() => {
-    if (!isConnected) return;
-    if (lastSentSceneIdRef.current === "Custom") return;
-
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "navigate",
-        target: "Custom"
-      }
-    });
-    console.log('🎮 [BuildDrama] 发送场景切换消息到iframe（去重）:', { effectiveSceneId, target: "Custom" });
-    lastSentSceneIdRef.current = "Custom";
-  }, [isConnected, sendMessageToGame, effectiveSceneId]);
-
-  // （移除主动发送逻辑，改为在连接完成后统一去重发送）
-
   // 使用useRef保存当前页码，避免闭包问题
   const currentPageRef = React.useRef(currentPage);
   

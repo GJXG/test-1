@@ -239,28 +239,6 @@ const Scene: React.FC = () => {
     }
   }, []);
 
-  // 记录已发送过的场景，避免重复发送
-  const lastSentSceneIdRef = React.useRef<string | null>(null);
-
-  // 当游戏已连接且gameSceneId有效时，去重发送场景切换消息
-  useEffect(() => {
-    if (!isConnected) return;
-    if (!gameSceneId || gameSceneId === 'MainMenu') return;
-    if (lastSentSceneIdRef.current === gameSceneId) return;
-
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "navigate",
-        target: gameSceneId
-      }
-    });
-    console.log('🎮 Scene页面：发送场景切换消息到iframe（去重）:', { sceneId, gameSceneId });
-    lastSentSceneIdRef.current = gameSceneId;
-  }, [isConnected, gameSceneId, sendMessageToGame, sceneId]);
-
-  // （移除主动发送逻辑，改为在连接完成后统一去重发送）
-
   // Scene页面静音控制（防重复发送）
   useEffect(() => {
     let lastVisibilityState = !document.hidden;
