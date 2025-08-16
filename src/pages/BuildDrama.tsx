@@ -778,15 +778,110 @@ const BuildDrama: React.FC = () => {
 
   // 在组件挂载时向iframe发送消息，只发送postMessage不改变URL
   useEffect(() => {
-    // 发送包含action和target参数的消息
-    sendMessageToGame({
-      type: "SEND_CUSTOM_EVENT",
-      data: {
-        action: "navigate",
-        target: "Custom"
+    let retryCount = 0;
+    const maxRetries = 50; // 最多重试50次 (5秒)
+    let retryTimer: NodeJS.Timeout | null = null;
+    let messageSent = false; // 防止重复发送
+    
+    // 发送消息的核心函数
+    const sendMessage = () => {
+      if (messageSent) return; // 如果已经发送过，不重复发送
+      
+      try {
+        sendMessageToGame({
+          type: "SEND_CUSTOM_EVENT",
+          data: {
+            action: "navigate",
+            target: "Custom"
+          }
+        });
+        messageSent = true;
+        console.log('✅ BuildDrama: 页面刷新后成功向iframe发送postMessage消息');
+      } catch (error) {
+        console.error('BuildDrama: 发送postMessage时出错:', error);
       }
-    });
-    console.log('BuildDrama: 只发送postMessage，不切换iframe URL');
+    };
+    
+    // 监听iframe的load事件（优先方案）
+    const handleIframeLoad = () => {
+      console.log('BuildDrama: iframe load事件触发，立即发送消息');
+      sendMessage();
+    };
+    
+    // 等待 iframe 加载完成后再发送消息（备用方案）
+    const sendMessageWhenReady = () => {
+      if (messageSent) return; // 如果已经通过load事件发送过，就不再重试
+      
+      console.log(`BuildDrama: 尝试发送postMessage，重试次数: ${retryCount}/${maxRetries}`);
+      
+      // 检查 iframe 是否存在且可访问
+      if (iframeRef.current?.contentWindow) {
+        try {
+          // 额外检查 iframe 是否真正加载完成
+          const iframe = iframeRef.current;
+          let documentReady = 'unknown';
+          try {
+            documentReady = iframe.contentDocument?.readyState || 'unknown';
+          } catch (e) {
+            // 跨域情况下无法访问 contentDocument
+            documentReady = 'cross-origin';
+          }
+          
+          console.log(`BuildDrama: iframe状态检查 - 存在: true, contentDocument ready: ${documentReady}`);
+          
+          // 发送消息
+          sendMessage();
+          return; // 成功发送，退出重试循环
+          
+        } catch (error) {
+          console.error('BuildDrama: 发送postMessage时出错:', error);
+        }
+      } else {
+        console.log('BuildDrama: iframe 或 contentWindow 不可用');
+      }
+      
+      // 如果发送失败且未达到最大重试次数，继续重试
+      retryCount++;
+      if (retryCount < maxRetries) {
+        console.log(`BuildDrama: iframe 未准备好，${100}ms后进行第${retryCount + 1}次重试`);
+        retryTimer = setTimeout(sendMessageWhenReady, 100);
+      } else {
+        console.error('❌ BuildDrama: 达到最大重试次数，放弃发送postMessage');
+      }
+    };
+
+    // 如果iframe已经存在，立即添加load事件监听
+    if (iframeRef.current) {
+      iframeRef.current.addEventListener('load', handleIframeLoad);
+      console.log('BuildDrama: 已添加iframe load事件监听器');
+      
+      // 如果iframe已经加载完成，立即发送消息
+      if (iframeRef.current.contentWindow) {
+        console.log('BuildDrama: iframe已存在且contentWindow可用，立即发送消息');
+        sendMessage();
+      }
+    }
+    
+    // 同时启动轮询检查作为备用方案
+    const pollTimer = setTimeout(() => {
+      if (!messageSent) {
+        console.log('BuildDrama: 启动备用轮询检查方案');
+        sendMessageWhenReady();
+      }
+    }, 200);
+    
+    // 清理函数：清除可能还在运行的定时器和事件监听
+    return () => {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      clearTimeout(pollTimer);
+      
+      if (iframeRef.current) {
+        iframeRef.current.removeEventListener('load', handleIframeLoad);
+      }
+    };
   }, []); // 移除sendMessageToGame依赖，避免重复发送
 
   // BuildDrama页面静音控制（防重复发送）

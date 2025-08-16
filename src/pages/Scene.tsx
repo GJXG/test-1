@@ -1373,6 +1373,114 @@ const Scene: React.FC = () => {
     };
   }, [effectiveSceneId, shouldSendRequest]); // 添加shouldSendRequest作为依赖
 
+  // 添加一个新的Effect，确保页面刷新时能向 iframe 发送 postMessage 消息，并且等待 iframe 加载完成后再发送
+  useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 50; // 最多重试50次 (5秒)
+    let retryTimer: NodeJS.Timeout | null = null;
+    let messageSent = false; // 防止重复发送
+    
+    // 发送消息的核心函数
+    const sendMessage = () => {
+      if (messageSent) return; // 如果已经发送过，不重复发送
+      
+      try {
+        sendMessageToGame({
+          type: "SEND_CUSTOM_EVENT",
+          data: {
+            action: "navigate",
+            target: gameSceneId
+          }
+        });
+        messageSent = true;
+        console.log(`✅ Scene: 页面刷新后成功向iframe发送场景导航消息，场景ID: ${gameSceneId}`);
+      } catch (error) {
+        console.error('Scene: 发送postMessage时出错:', error);
+      }
+    };
+    
+    // 监听iframe的load事件（优先方案）
+    const handleIframeLoad = () => {
+      console.log(`Scene: iframe load事件触发，立即发送消息，场景ID: ${gameSceneId}`);
+      sendMessage();
+    };
+    
+    // 等待 iframe 加载完成后再发送消息（备用方案）
+    const sendMessageWhenReady = () => {
+      if (messageSent) return; // 如果已经通过load事件发送过，就不再重试
+      
+      console.log(`Scene: 尝试发送postMessage，重试次数: ${retryCount}/${maxRetries}，场景ID: ${gameSceneId}`);
+      
+      // 检查 iframe 是否存在且可访问
+      if (iframeRef.current?.contentWindow) {
+        try {
+          // 额外检查 iframe 是否真正加载完成
+          const iframe = iframeRef.current;
+          let documentReady = 'unknown';
+          try {
+            documentReady = iframe.contentDocument?.readyState || 'unknown';
+          } catch (e) {
+            // 跨域情况下无法访问 contentDocument
+            documentReady = 'cross-origin';
+          }
+          
+          console.log(`Scene: iframe状态检查 - 存在: true, contentDocument ready: ${documentReady}`);
+          
+          // 发送消息
+          sendMessage();
+          return; // 成功发送，退出重试循环
+          
+        } catch (error) {
+          console.error('Scene: 发送postMessage时出错:', error);
+        }
+      } else {
+        console.log('Scene: iframe 或 contentWindow 不可用');
+      }
+      
+      // 如果发送失败且未达到最大重试次数，继续重试
+      retryCount++;
+      if (retryCount < maxRetries) {
+        console.log(`Scene: iframe 未准备好，${100}ms后进行第${retryCount + 1}次重试`);
+        retryTimer = setTimeout(sendMessageWhenReady, 100);
+      } else {
+        console.error(`❌ Scene: 达到最大重试次数，放弃发送postMessage，场景ID: ${gameSceneId}`);
+      }
+    };
+
+    // 如果iframe已经存在，立即添加load事件监听
+    if (iframeRef.current) {
+      iframeRef.current.addEventListener('load', handleIframeLoad);
+      console.log(`Scene: 已添加iframe load事件监听器，场景ID: ${gameSceneId}`);
+      
+      // 如果iframe已经加载完成，立即发送消息
+      if (iframeRef.current.contentWindow) {
+        console.log(`Scene: iframe已存在且contentWindow可用，立即发送消息，场景ID: ${gameSceneId}`);
+        sendMessage();
+      }
+    }
+    
+    // 同时启动轮询检查作为备用方案
+    const pollTimer = setTimeout(() => {
+      if (!messageSent) {
+        console.log(`Scene: 启动备用轮询检查方案，场景ID: ${gameSceneId}`);
+        sendMessageWhenReady();
+      }
+    }, 200);
+    
+    // 清理函数：清除可能还在运行的定时器和事件监听
+    return () => {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      clearTimeout(pollTimer);
+      
+      if (iframeRef.current) {
+        iframeRef.current.removeEventListener('load', handleIframeLoad);
+      }
+    };
+  }, [gameSceneId]); // 移除sendMessageToGame依赖，避免重复发送
+
   // 渲染内容
   return (
     <div className="h-screen flex overflow-hidden">
