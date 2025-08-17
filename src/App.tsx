@@ -10,7 +10,7 @@ import Scene from "./pages/Scene";
 import BuildDrama from "./pages/BuildDrama";
 import NotFound from "./pages/NotFound";
 import Mobile from "./pages/Mobile";
-import { GlobalIframe, CocosProvider } from "./components/CocosEmbed";
+import { GlobalIframe, CocosProvider, useCocos } from "./components/CocosEmbed";
 import LoadingScreen from "./components/LoadingScreen";
 import useIsMobile from './hooks/useIsMobile';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -21,6 +21,7 @@ const queryClient = new QueryClient();
 
 const AppRoutes: React.FC = () => {
   const isMobile = useIsMobile();
+  const { isConnected } = useCocos(); // 获取iframe连接状态
 
   // 检测到移动端时重定向到外部链接
   React.useEffect(() => {
@@ -40,6 +41,10 @@ const AppRoutes: React.FC = () => {
     );
   }
   */
+
+  // 使用isConnected状态来确定是否已完成预加载
+  // 当isConnected为true时，表示iframe已加载完成
+  console.log('iframe连接状态:', isConnected ? '已连接' : '未连接');
 
   return (
     <Routes>
@@ -85,9 +90,28 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // 添加iframe预加载状态监控
+  const [iframePreloaded, setIframePreloaded] = React.useState(false);
+  
+  // 监听iframe加载完成事件
+  React.useEffect(() => {
+    const handleIframeLoaded = () => {
+      console.log('iframe预加载完成，可以正常进入其他页面');
+      setIframePreloaded(true);
+    };
+    
+    // 监听自定义事件
+    window.addEventListener('iframe-loaded', handleIframeLoaded);
+    
+    return () => {
+      window.removeEventListener('iframe-loaded', handleIframeLoaded);
+    };
+  }, []);
+
   return (
     <>
       <CocosProvider>
+        {/* 全局iframe预加载，在应用启动时就开始加载 */}
         <GlobalIframe/>
         <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
           <QueryClientProvider client={queryClient}>

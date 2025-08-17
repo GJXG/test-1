@@ -66,7 +66,7 @@ const LoadingScreen: React.FC = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       try {
-        if (event.data && event.data.type === 'GAME_LOADED') {
+        if (event.data || event.data.type === 'GAME_LOADED') {
           // Game loading complete
           console.log('Game loaded successfully');
           setProgress(100);

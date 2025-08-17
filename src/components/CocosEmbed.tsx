@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import { cn } from '@/lib/utils';
+import { log } from 'console';
 
 // 创建上下文
 interface CocosContextType {
@@ -156,6 +157,11 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (event.data.type === 'GAME_LOADED') {
           setIsConnected(true);
           console.log('React: 游戏iframe已加载');
+        
+          // 触发自定义事件，通知App组件iframe已加载完成
+          const iframeLoadedEvent = new Event('iframe-loaded');
+          window.dispatchEvent(iframeLoadedEvent);
+          console.log('已触发iframe-loaded事件');
           
           // 检查是否有已登录的用户信息，如果有则发送邮箱
           const storedUserInfo = localStorage.getItem('userInfo');
@@ -262,14 +268,20 @@ export const GlobalIframe: React.FC = () => {
   const iframeUrl = 'https://dramai.world/webframe/';
   const cocosContext = useCocos();
   
-  // 确保iframe在应用启动时就开始加载
+  // 确保iframe在应用启动时就开始加载，设置为eager加载
   useEffect(() => {
-    console.log('GlobalIframe: 开始加载iframe，URL:', iframeUrl);
+    console.log('GlobalIframe: 开始预加载iframe，URL:', iframeUrl);
     if (iframeRef.current) {
-      // 确保iframe有src
+      // 确保iframe有src并立即加载
       if (!iframeRef.current.src) {
         iframeRef.current.src = iframeUrl;
       }
+      
+      // 设置loading属性为eager，确保立即加载
+      iframeRef.current.loading = 'eager';
+      
+      // 设置优先级属性为high，提高加载优先级
+      iframeRef.current.setAttribute('importance', 'high');
     }
   }, [iframeUrl]);
   
@@ -372,9 +384,10 @@ export const GlobalIframe: React.FC = () => {
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         referrerPolicy="no-referrer"
         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-        // 取消 lazy，避免进入页面时不加载导致黑屏
+        // 设置为eager，确保立即加载，不延迟
         loading="eager"
-        title={position === 'hidden' ? "Game Embed Preloader" : "Game Embed"}
+        // 预加载提示
+        title={position === 'hidden' ? "Game Embed Preloader (Loading)" : "Game Embed"}
       />
       
       {/* 静音按钮 - 已隐藏但保留功能代码 */}
