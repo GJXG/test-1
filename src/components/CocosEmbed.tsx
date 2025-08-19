@@ -28,6 +28,11 @@ let globalSetIsMuted: ((muted: boolean) => void) | null = null;
 let globalToggleMute: (() => void) | null = null;
 let globalSetIframeUrl: ((url: string) => void) | null = null;
 
+// 防抖机制相关变量
+let gameLoadedProcessed = false;
+let gameLoadedTimer: NodeJS.Timeout | null = null;
+const GAME_LOADED_DEBOUNCE_DELAY = 100; // 100ms 防抖延迟
+
 // 全局方法，用于发送消息到 iframe
 const sendMessageToIframe = (message: any) => {
   try {
@@ -40,6 +45,84 @@ const sendMessageToIframe = (message: any) => {
   } catch (error) {
     console.error('发送消息到iframe失败:', error);
   }
+};
+
+// 防抖的游戏加载处理函数
+const handleGameLoadedDebounced = (
+  sendMessageToGame: (message: any) => void,
+  sendUserEmail: (email: string, loginType?: number) => void,
+  setIsConnected: (connected: boolean) => void
+) => {
+  // 清除之前的定时器
+  if (gameLoadedTimer) {
+    clearTimeout(gameLoadedTimer);
+  }
+
+  // 设置新的防抖定时器
+  gameLoadedTimer = setTimeout(() => {
+    // 检查是否已经处理过
+    if (gameLoadedProcessed) {
+      console.log('React: GAME_LOADED 已处理过，跳过重复处理');
+      return;
+    }
+
+    console.log('React: 开始处理 GAME_LOADED 事件');
+    gameLoadedProcessed = true;
+
+    // 设置连接状态
+    setIsConnected(true);
+    console.log('React: 游戏iframe已加载');
+
+    // 触发自定义事件，通知App组件iframe已加载完成
+    const iframeLoadedEvent = new Event('iframe-loaded');
+    window.dispatchEvent(iframeLoadedEvent);
+    console.log('已触发iframe-loaded事件');
+
+    // 检查是否有已登录的用户信息，如果有则发送邮箱
+    const storedUserInfo = localStorage.getItem('userInfo');
+    const storedLoginStatus = localStorage.getItem('isSignedIn');
+
+    if (storedUserInfo && storedLoginStatus === 'true') {
+      try {
+        const userInfo = JSON.parse(storedUserInfo);
+        if (userInfo.userId && userInfo.userId.includes('@')) {
+          sendUserEmail(userInfo.userId, 1);
+          console.log('React: 已发送用户登录信息到游戏');
+        }
+      } catch (error) {
+        console.error('解析用户信息失败:', error);
+      }
+    }
+
+    // 发送初始场景数据
+    sendMessageToGame({
+      type: 'INIT_SCENE',
+      data: {
+        scenes: []
+      }
+    });
+    console.log('React: 已发送初始场景数据');
+
+  }, GAME_LOADED_DEBOUNCE_DELAY);
+};
+
+// 重置防抖状态的函数，用于页面刷新或重新加载时
+const resetGameLoadedState = () => {
+  gameLoadedProcessed = false;
+  if (gameLoadedTimer) {
+    clearTimeout(gameLoadedTimer);
+    gameLoadedTimer = null;
+  }
+  console.log('React: 已重置 GAME_LOADED 防抖状态');
+};
+
+// 导出用于调试的函数
+export const debugGameLoadedState = () => {
+  console.log('React: 当前 GAME_LOADED 状态:', {
+    gameLoadedProcessed,
+    gameLoadedTimer: gameLoadedTimer !== null,
+    GAME_LOADED_DEBOUNCE_DELAY
+  });
 };
 
 export const useCocos = () => {
@@ -155,36 +238,8 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handleMessage = (event: MessageEvent) => {
       try {
         if (event.data.type === 'GAME_LOADED') {
-          setIsConnected(true);
-          console.log('React: 游戏iframe已加载');
-        
-          // 触发自定义事件，通知App组件iframe已加载完成
-          const iframeLoadedEvent = new Event('iframe-loaded');
-          window.dispatchEvent(iframeLoadedEvent);
-          console.log('已触发iframe-loaded事件');
-          
-          // 检查是否有已登录的用户信息，如果有则发送邮箱
-          const storedUserInfo = localStorage.getItem('userInfo');
-          const storedLoginStatus = localStorage.getItem('isSignedIn');
-          
-          if (storedUserInfo && storedLoginStatus === 'true') {
-            try {
-              const userInfo = JSON.parse(storedUserInfo);
-              if (userInfo.userId && userInfo.userId.includes('@')) {
-                sendUserEmail(userInfo.userId, 1);
-              }
-            } catch (error) {
-              console.error('解析用户信息失败:', error);
-            }
-          }
-          
-          // 发送初始场景数据
-          sendMessageToGame({
-            type: 'INIT_SCENE',
-            data: {
-              scenes: []
-            }
-          });
+          // 使用防抖机制处理 GAME_LOADED 事件
+          handleGameLoadedDebounced(sendMessageToGame, sendUserEmail, setIsConnected);
         }
         setLastMessage(JSON.stringify(event.data));
         setMessageLog(prev => [...prev, `Received: ${JSON.stringify(event.data)}`]);
@@ -524,32 +579,8 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
     const handleMessage = (event: MessageEvent) => {
       try {
         if (event.data.type === 'GAME_LOADED') {
-          setIsConnected(true);
-          console.log('React: 游戏iframe已加载');
-          
-          // 检查是否有已登录的用户信息，如果有则发送邮箱
-          const storedUserInfo = localStorage.getItem('userInfo');
-          const storedLoginStatus = localStorage.getItem('isSignedIn');
-          
-          if (storedUserInfo && storedLoginStatus === 'true') {
-            try {
-              const userInfo = JSON.parse(storedUserInfo);
-              if (userInfo.userId && userInfo.userId.includes('@')) {
-                // 如果userId包含@符号，说明是邮箱格式
-                sendUserEmail(userInfo.userId, 1); // 默认登录类型为1
-              }
-            } catch (error) {
-              console.error('解析用户信息失败:', error);
-            }
-          }
-          
-          // 发送初始场景数据
-          sendMessageToGame({
-            type: 'INIT_SCENE',
-            data: {
-              scenes: []
-            }
-          });
+          // 使用防抖机制处理 GAME_LOADED 事件
+          handleGameLoadedDebounced(sendMessageToGame, sendUserEmail, setIsConnected);
         }
         setLastMessage(JSON.stringify(event.data));
         setMessageLog(prev => [...prev, `Received: ${JSON.stringify(event.data)}`]);
