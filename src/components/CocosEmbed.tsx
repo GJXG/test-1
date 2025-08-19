@@ -47,7 +47,7 @@ const sendMessageToIframe = (message: any) => {
   }
 };
 
-// 防抖的游戏加载处理函数
+// 防抖的游戏加载处理函数 - 只处理用户信息和初始场景数据，不处理场景导航
 const handleGameLoadedDebounced = (
   sendMessageToGame: (message: any) => void,
   sendUserEmail: (email: string, loginType?: number) => void,
@@ -60,16 +60,9 @@ const handleGameLoadedDebounced = (
 
   // 设置新的防抖定时器
   gameLoadedTimer = setTimeout(() => {
-    // 检查是否已经处理过
-    if (gameLoadedProcessed) {
-      console.log('React: GAME_LOADED 已处理过，跳过重复处理');
-      return;
-    }
-
-    console.log('React: 开始处理 GAME_LOADED 事件');
-    gameLoadedProcessed = true;
-
-    // 设置连接状态
+    console.log('React: 开始处理 GAME_LOADED 事件的用户信息和初始场景数据');
+    
+    // 设置连接状态 - 不再检查gameLoadedProcessed标志，确保每次都处理
     setIsConnected(true);
     console.log('React: 游戏iframe已加载');
 
@@ -102,6 +95,10 @@ const handleGameLoadedDebounced = (
       }
     });
     console.log('React: 已发送初始场景数据');
+
+    // 设置gameLoadedProcessed为true，表示基本处理已完成
+    // 但场景导航消息会在每次GAME_LOADED事件中单独处理
+    gameLoadedProcessed = true;
 
   }, GAME_LOADED_DEBOUNCE_DELAY);
 };
@@ -161,12 +158,13 @@ const getCurrentSceneId = (): string | null => {
 
 // 重置防抖状态的函数，用于页面刷新或重新加载时
 const resetGameLoadedState = () => {
-  gameLoadedProcessed = false;
+  // 保留gameLoadedProcessed为true，确保基本处理只执行一次
+  // 但场景导航消息会在每次GAME_LOADED事件中单独处理
   if (gameLoadedTimer) {
     clearTimeout(gameLoadedTimer);
     gameLoadedTimer = null;
   }
-  console.log('React: 已重置 GAME_LOADED 防抖状态');
+  console.log('React: 已重置 GAME_LOADED 定时器状态，但保持基本处理状态');
 };
 
 // 导出用于调试的函数
@@ -291,9 +289,10 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handleMessage = (event: MessageEvent) => {
       try {
         if (event.data.type === 'GAME_LOADED') {
-          // 延迟3秒发送场景导航消息
+          // 立即获取当前场景ID并发送场景导航消息（不使用防抖）
           const currentSceneId = getCurrentSceneId();
           if (currentSceneId) {
+            // 延迟1秒发送场景导航消息，确保游戏引擎已准备好
             setTimeout(() => {
               sendMessageToGame({
                 type: "SEND_CUSTOM_EVENT",
@@ -302,8 +301,8 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   target: currentSceneId
                 }
               });
-              console.log(`React: CocosProvider 已延迟3秒发送场景导航消息: ${currentSceneId}`);
-            }, 3000);
+              console.log(`React: CocosProvider 已发送场景导航消息: ${currentSceneId}`);
+            }, 1000);
           }
           
           // 使用防抖机制处理其他 GAME_LOADED 事件
@@ -673,9 +672,10 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
     const handleMessage = (event: MessageEvent) => {
       try {
         if (event.data.type === 'GAME_LOADED') {
-          // 延迟3秒发送场景导航消息
+          // 立即获取当前场景ID并发送场景导航消息（不使用防抖）
           const currentSceneId = getCurrentSceneId();
           if (currentSceneId) {
+            // 延迟1秒发送场景导航消息，确保游戏引擎已准备好
             setTimeout(() => {
               sendMessageToGame({
                 type: "SEND_CUSTOM_EVENT",
@@ -684,8 +684,8 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
                   target: currentSceneId
                 }
               });
-              console.log(`React: CocosEmbed 已延迟3秒发送场景导航消息: ${currentSceneId}`);
-            }, 3000);
+              console.log(`React: CocosEmbed 已发送场景导航消息: ${currentSceneId}`);
+            }, 1000);
           }
           
           // 使用防抖机制处理其他 GAME_LOADED 事件
