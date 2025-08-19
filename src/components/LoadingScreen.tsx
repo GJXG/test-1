@@ -8,38 +8,37 @@ const LoadingScreen: React.FC = () => {
   const navigate = useNavigate();
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // Ensure iframe is loaded
+  // 监控iframe加载状态，但不干预加载过程
   useEffect(() => {
-    console.log('LoadingScreen: 检查iframe状态');
+    console.log('LoadingScreen: 监控iframe加载状态');
     
-    const ensureIframeLoaded = () => {
+    const checkIframeStatus = () => {
       if (iframeRef.current) {
-        if (!iframeRef.current.src) {
-          console.log('LoadingScreen: 设置iframe src');
-          iframeRef.current.src = "https://dramai.world/webframe/";
-        } else {
-          console.log('LoadingScreen: iframe src已存在:', iframeRef.current.src);
-        }
-        return true; // iframe已找到并处理
+        console.log('LoadingScreen: iframe已挂载，src:', iframeRef.current.src);
+        console.log('LoadingScreen: iframe readyState:', iframeRef.current.readyState);
+        return true;
       } else {
-        console.log('LoadingScreen: iframeRef.current 不存在，等待GlobalIframe挂载');
-        return false; // iframe还未挂载
+        console.log('LoadingScreen: 等待GlobalIframe挂载...');
+        return false;
       }
     };
     
-    // 立即尝试一次
-    if (!ensureIframeLoaded()) {
-      // 如果iframe还没挂载，每100ms检查一次，最多检查50次（5秒）
-      const checkInterval = setInterval(() => {
-        if (ensureIframeLoaded()) {
-          clearInterval(checkInterval);
+    // 立即检查一次
+    if (!checkIframeStatus()) {
+      // 如果iframe还没挂载，每500ms检查一次状态
+      const statusCheckInterval = setInterval(() => {
+        if (checkIframeStatus()) {
+          clearInterval(statusCheckInterval);
         }
-      }, 100);
+      }, 500);
       
-      // 5秒后停止检查
+      // 10秒后停止检查
       setTimeout(() => {
-        clearInterval(checkInterval);
-      }, 5000);
+        clearInterval(statusCheckInterval);
+        console.log('LoadingScreen: 停止iframe状态检查');
+      }, 10000);
+      
+      return () => clearInterval(statusCheckInterval);
     }
   }, []);
 

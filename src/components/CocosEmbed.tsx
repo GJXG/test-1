@@ -106,6 +106,59 @@ const handleGameLoadedDebounced = (
   }, GAME_LOADED_DEBOUNCE_DELAY);
 };
 
+// 获取当前页面的场景ID
+const getCurrentSceneId = (): string | null => {
+  const currentPath = window.location.pathname;
+  const urlParams = new URLSearchParams(window.location.search);
+  
+  try {
+    // 根据当前路径确定场景ID
+    if (currentPath === '/scene') {
+      // Scene页面：从URL参数获取sceneId
+      const sceneId = urlParams.get('sceneId') || 'MainMenu';
+      
+      // 映射场景ID到游戏引擎使用的ID
+      const getGameSceneId = (id: string) => {
+        const npcId = parseInt(id);
+        
+        // 牧场场景的NPC
+        if ([10016, 10017, 10018, 10019, 10020, 10021].includes(npcId)) {
+          return '4';
+        }
+        
+        // 偶像场景的NPC
+        if ([10012, 10009, 10006, 10022].includes(npcId)) {
+          return '3';
+        }
+        
+        return id;
+      };
+      
+      const gameSceneId = getGameSceneId(sceneId);
+      console.log(`React: Scene页面检测到场景ID: ${sceneId} -> 游戏场景ID: ${gameSceneId}`);
+      return gameSceneId;
+      
+    } else if (currentPath === '/build-drama') {
+      // BuildDrama页面：固定使用偶像场景ID (3)
+      console.log('React: BuildDrama页面，使用固定场景ID: Custom');
+      return 'Custom';
+      
+    } else if (currentPath === '/home' || currentPath === '/') {
+      // 首页或根路径：使用默认场景
+      console.log('React: 首页检测，使用默认场景ID: MainMenu');
+      return 'MainMenu';
+      
+    } else {
+      // 其他页面：不发送场景导航
+      console.log(`React: 未知页面路径: ${currentPath}，不发送场景导航`);
+      return null;
+    }
+  } catch (error) {
+    console.error('React: 获取当前场景ID失败:', error);
+    return null;
+  }
+};
+
 // 重置防抖状态的函数，用于页面刷新或重新加载时
 const resetGameLoadedState = () => {
   gameLoadedProcessed = false;
@@ -238,7 +291,22 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handleMessage = (event: MessageEvent) => {
       try {
         if (event.data.type === 'GAME_LOADED') {
-          // 使用防抖机制处理 GAME_LOADED 事件
+          // 延迟3秒发送场景导航消息
+          const currentSceneId = getCurrentSceneId();
+          if (currentSceneId) {
+            setTimeout(() => {
+              sendMessageToGame({
+                type: "SEND_CUSTOM_EVENT",
+                data: {
+                  action: "navigate",
+                  target: currentSceneId
+                }
+              });
+              console.log(`React: CocosProvider 已延迟3秒发送场景导航消息: ${currentSceneId}`);
+            }, 3000);
+          }
+          
+          // 使用防抖机制处理其他 GAME_LOADED 事件
           handleGameLoadedDebounced(sendMessageToGame, sendUserEmail, setIsConnected);
         }
         setLastMessage(JSON.stringify(event.data));
@@ -325,18 +393,41 @@ export const GlobalIframe: React.FC = () => {
   
   // 确保iframe在应用启动时就开始加载，设置为eager加载
   useEffect(() => {
-    console.log('GlobalIframe: 开始预加载iframe，URL:', iframeUrl);
-    if (iframeRef.current) {
-      // 确保iframe有src并立即加载
-      if (!iframeRef.current.src) {
-        iframeRef.current.src = iframeUrl;
+    console.log('GlobalIframe: 组件挂载，开始预加载iframe，URL:', iframeUrl);
+    
+    // 立即尝试设置iframe属性
+    const setupIframe = () => {
+      if (iframeRef.current) {
+        console.log('GlobalIframe: iframe ref已就绪，设置加载属性');
+        
+        // 确保iframe有src并立即加载
+        if (!iframeRef.current.src || iframeRef.current.src === 'about:blank') {
+          iframeRef.current.src = iframeUrl;
+          console.log('GlobalIframe: 设置iframe src为:', iframeUrl);
+        }
+        
+        // 设置loading属性为eager，确保立即加载
+        iframeRef.current.loading = 'eager';
+        
+        // 设置优先级属性为high，提高加载优先级
+        iframeRef.current.setAttribute('importance', 'high');
+        
+        console.log('GlobalIframe: iframe加载属性设置完成');
+        return true;
       }
+      return false;
+    };
+    
+    // 立即尝试一次
+    if (!setupIframe()) {
+      // 如果iframe还没挂载，使用setTimeout在下一个事件循环中再试
+      const retryTimer = setTimeout(() => {
+        if (!setupIframe()) {
+          console.warn('GlobalIframe: iframe ref在setTimeout后仍未就绪');
+        }
+      }, 0);
       
-      // 设置loading属性为eager，确保立即加载
-      iframeRef.current.loading = 'eager';
-      
-      // 设置优先级属性为high，提高加载优先级
-      iframeRef.current.setAttribute('importance', 'high');
+      return () => clearTimeout(retryTimer);
     }
   }, [iframeUrl]);
   
@@ -443,6 +534,9 @@ export const GlobalIframe: React.FC = () => {
         loading="eager"
         // 预加载提示
         title={position === 'hidden' ? "Game Embed Preloader (Loading)" : "Game Embed"}
+        // 添加加载事件监听
+        onLoad={() => console.log('GlobalIframe: iframe onLoad 事件触发')}
+        onError={(e) => console.error('GlobalIframe: iframe onError 事件触发:', e)}
       />
       
       {/* 静音按钮 - 已隐藏但保留功能代码 */}
@@ -579,7 +673,22 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
     const handleMessage = (event: MessageEvent) => {
       try {
         if (event.data.type === 'GAME_LOADED') {
-          // 使用防抖机制处理 GAME_LOADED 事件
+          // 延迟3秒发送场景导航消息
+          const currentSceneId = getCurrentSceneId();
+          if (currentSceneId) {
+            setTimeout(() => {
+              sendMessageToGame({
+                type: "SEND_CUSTOM_EVENT",
+                data: {
+                  action: "navigate",
+                  target: currentSceneId
+                }
+              });
+              console.log(`React: CocosEmbed 已延迟3秒发送场景导航消息: ${currentSceneId}`);
+            }, 3000);
+          }
+          
+          // 使用防抖机制处理其他 GAME_LOADED 事件
           handleGameLoadedDebounced(sendMessageToGame, sendUserEmail, setIsConnected);
         }
         setLastMessage(JSON.stringify(event.data));
