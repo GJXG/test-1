@@ -15,7 +15,8 @@ const LoadingScreen: React.FC = () => {
     const checkIframeStatus = () => {
       if (iframeRef.current) {
         console.log('LoadingScreen: iframe已挂载，src:', iframeRef.current.src);
-        console.log('LoadingScreen: iframe readyState:', iframeRef.current.readyState);
+        const docReadyState = iframeRef.current.contentDocument?.readyState;
+        console.log('LoadingScreen: iframe document readyState:', docReadyState);
         return true;
       } else {
         console.log('LoadingScreen: 等待GlobalIframe挂载...');
@@ -65,7 +66,7 @@ const LoadingScreen: React.FC = () => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       try {
-        if (event.data || event.data.type === 'GAME_LOADED') {
+        if (event.data && event.data.type === 'GAME_LOADED') {
           // Game loading complete
           console.log('Game loaded successfully');
           setProgress(100);
