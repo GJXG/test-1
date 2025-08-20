@@ -18,44 +18,45 @@ import TermsOfService from './pages/TermsOfService';
 import CommunityGuidelines from './pages/CommunityGuidelines';
 
 const queryClient = new QueryClient();
-
+// 测试模式：暂时隐藏iframe控制按钮
 // 添加一个IframeToggleButton组件
-const IframeToggleButton: React.FC = () => {
-  const { showIframe, setShowIframe } = useCocos();
+
+// const IframeToggleButton: React.FC = () => {
+//   const { showIframe, setShowIframe } = useCocos();
   
-  const handleToggle = () => {
-    console.log('切换iframe显示状态:', !showIframe);
-    setShowIframe(!showIframe);
-  };
+//   const handleToggle = () => {
+//     console.log('切换iframe显示状态:', !showIframe);
+//     setShowIframe(!showIframe);
+//   };
   
-  return (
-    <button
-      onClick={handleToggle}
-      className="fixed top-4 right-4 z-[1002] bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2"
-      title={`当前状态: ${showIframe ? '显示' : '隐藏'}`}
-    >
-      {showIframe ? (
-        <>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="9" y1="9" x2="15" y2="15"></line>
-            <line x1="15" y1="9" x2="9" y2="15"></line>
-          </svg>
-          隐藏游戏
-        </>
-      ) : (
-        <>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="9" y1="9" x2="15" y2="15"></line>
-            <line x1="15" y1="9" x2="9" y2="15"></line>
-          </svg>
-          显示游戏
-        </>
-      )}
-    </button>
-  );
-};
+//   return (
+//     <button
+//       onClick={handleToggle}
+//       className="fixed top-4 right-4 z-[1002] bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 flex items-center gap-2"
+//       title={`当前状态: ${showIframe ? '显示' : '隐藏'}`}
+//     >
+//       {showIframe ? (
+//         <>
+//           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+//             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+//             <line x1="9" y1="9" x2="15" y2="15"></line>
+//             <line x1="15" y1="9" x2="9" y2="15"></line>
+//           </svg>
+//           隐藏游戏
+//         </>
+//       ) : (
+//         <>
+//           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+//             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+//             <line x1="9" y1="9" x2="15" y2="15"></line>
+//             <line x1="15" y1="9" x2="9" y2="15"></line>
+//           </svg>
+//           显示游戏
+//         </>
+//       )}
+//     </button>
+//   );
+// };
 
 const AppRoutes: React.FC = () => {
   const isMobile = useIsMobile();
@@ -100,8 +101,8 @@ const AppRoutes: React.FC = () => {
 
   return (
     <>
-      {/* 添加iframe控制按钮 */}
-      <IframeToggleButton />
+      {/* 添加iframe控制按钮  测试模式：暂时隐藏iframe控制按钮*/}
+      {/* <IframeToggleButton /> */}
       <Routes>
         {/* LoadingScreen as initial route */}
         <Route path="/" element={<LoadingScreen />} />
@@ -110,6 +111,10 @@ const AppRoutes: React.FC = () => {
         <Route path="/home" element={isConnected ? <Index /> : <Navigate replace to="/" />} />
         <Route path="/scene" element={isConnected ? <Scene /> : <Navigate replace to="/" />} />
         <Route path="/build-drama" element={isConnected ? <BuildDrama /> : <Navigate replace to="/" />} />
+        {/*测试模式：暂时隐藏路由规则，避免iframe加载失败 */}
+        {/* <Route path="/home" element={ <Index /> } />
+        <Route path="/scene" element={ <Scene /> } />
+        <Route path="/build-drama" element={ <BuildDrama /> } /> */}
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/community-guidelines" element={<CommunityGuidelines />} />

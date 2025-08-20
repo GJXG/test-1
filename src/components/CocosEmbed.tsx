@@ -595,7 +595,10 @@ export const GlobalIframe: React.FC = () => {
         style={{
           // 由 CocosEmbed.positionIframeToContainer 负责 left/top/width/height
           zIndex: position === 'hidden' ? -1 : 999,
-          borderRadius: position === 'container' ? '8px' : '0'
+          borderRadius: position === 'container' ? '8px' : '0',
+          // 根据当前路由动态调整尺寸
+          width: (window.location.pathname === '/scene' || window.location.pathname === '/build-drama') ? 'auto' : '1px',
+          height: (window.location.pathname === '/scene' || window.location.pathname === '/build-drama') ? 'auto' : '1px'
         }}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         referrerPolicy="no-referrer"
@@ -718,13 +721,24 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
 
     const container = containerRef.current;
     const rect = container.getBoundingClientRect();
+    const currentPath = window.location.pathname;
 
     const iframe = iframeRef.current;
     iframe.style.position = 'fixed';
     iframe.style.left = `${rect.left}px`;
     iframe.style.top = `${rect.top}px`;
-    iframe.style.width = `${rect.width}px`;
-    iframe.style.height = `${rect.height}px`;
+    
+    // 根据当前路由决定iframe尺寸
+    if (currentPath === '/scene' || currentPath === '/build-drama') {
+      // 在scene和build-drama页面显示原来的比例
+      iframe.style.width = `${rect.width}px`;
+      iframe.style.height = `${rect.height}px`;
+    } else {
+      // 在其他界面时宽高设置为1px
+      iframe.style.width = '1px';
+      iframe.style.height = '1px';
+    }
+    
     iframe.style.zIndex = '1000';
     iframe.style.borderRadius = '8px';
   };
@@ -869,6 +883,39 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
     
     return () => {
       resizeObserver.disconnect();
+    };
+  }, []);
+
+  // 监听路由变化，重新定位iframe
+  useEffect(() => {
+    const handleRouteChange = () => {
+      // 延迟一点执行，确保DOM已更新
+      setTimeout(() => {
+        positionIframeToContainer();
+      }, 100);
+    };
+
+    // 监听 popstate 事件（浏览器前进后退）
+    window.addEventListener('popstate', handleRouteChange);
+    
+    // 监听 pushstate 和 replacestate 事件（编程式导航）
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    
+    history.pushState = function(...args) {
+      originalPushState.apply(history, args);
+      handleRouteChange();
+    };
+    
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(history, args);
+      handleRouteChange();
+    };
+
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
     };
   }, []);
   
