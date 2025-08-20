@@ -33,6 +33,11 @@ let gameLoadedProcessed = false;
 let gameLoadedTimer: NodeJS.Timeout | null = null;
 const GAME_LOADED_DEBOUNCE_DELAY = 100; // 100ms 防抖延迟
 
+// 用户登录消息防抖机制
+let userLoginTimer: NodeJS.Timeout | null = null;
+const USER_LOGIN_DEBOUNCE_DELAY = 200; // 200ms 防抖延迟
+let lastUserLoginData: { email: string; loginType: number } | null = null;
+
 // 全局方法，用于发送消息到 iframe
 const sendMessageToIframe = (message: any) => {
   try {
@@ -45,6 +50,46 @@ const sendMessageToIframe = (message: any) => {
   } catch (error) {
     console.error('发送消息到iframe失败:', error);
   }
+};
+
+// 防抖的用户登录消息发送函数
+const sendUserLoginDebounced = (
+  sendMessageToGame: (message: any) => void,
+  email: string,
+  loginType: number = 1
+) => {
+  // 清除之前的定时器
+  if (userLoginTimer) {
+    clearTimeout(userLoginTimer);
+  }
+
+  // 检查是否与上次发送的数据相同
+  if (lastUserLoginData && 
+      lastUserLoginData.email === email && 
+      lastUserLoginData.loginType === loginType) {
+    console.log('React: 用户登录信息相同，跳过重复发送');
+    return;
+  }
+
+  // 设置新的防抖定时器
+  userLoginTimer = setTimeout(() => {
+    const userEmailMessage = {
+      type: 'USER_LOGIN',
+      action: 'setUserEmail',
+      data: {
+        email: email,
+        timestamp: new Date().toISOString(),
+        source: 'react_parent',
+        loginType: loginType
+      }
+    };
+    
+    sendMessageToGame(userEmailMessage);
+    console.log('React: 防抖后发送用户登录信息到游戏 ->', email, '登录类型:', loginType);
+    
+    // 记录最后发送的数据
+    lastUserLoginData = { email, loginType };
+  }, USER_LOGIN_DEBOUNCE_DELAY);
 };
 
 // 防抖的游戏加载处理函数 - 只处理用户信息和初始场景数据，不处理场景导航
@@ -71,7 +116,7 @@ const handleGameLoadedDebounced = (
     window.dispatchEvent(iframeLoadedEvent);
     console.log('已触发iframe-loaded事件');
 
-    // 检查是否有已登录的用户信息，如果有则发送邮箱
+    // 检查是否有已登录的用户信息，如果有则发送邮箱（使用防抖）
     const storedUserInfo = localStorage.getItem('userInfo');
     const storedLoginStatus = localStorage.getItem('isSignedIn');
 
@@ -79,8 +124,8 @@ const handleGameLoadedDebounced = (
       try {
         const userInfo = JSON.parse(storedUserInfo);
         if (userInfo.userId && userInfo.userId.includes('@')) {
-          sendUserEmail(userInfo.userId, 1);
-          console.log('React: 已发送用户登录信息到游戏');
+          sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
+          console.log('React: 已调用防抖用户登录函数');
         }
       } catch (error) {
         console.error('解析用户信息失败:', error);
@@ -167,12 +212,31 @@ const resetGameLoadedState = () => {
   console.log('React: 已重置 GAME_LOADED 定时器状态，但保持基本处理状态');
 };
 
+// 重置用户登录防抖状态的函数
+export const resetUserLoginState = () => {
+  if (userLoginTimer) {
+    clearTimeout(userLoginTimer);
+    userLoginTimer = null;
+  }
+  lastUserLoginData = null;
+  console.log('React: 已重置用户登录防抖状态');
+};
+
 // 导出用于调试的函数
 export const debugGameLoadedState = () => {
   console.log('React: 当前 GAME_LOADED 状态:', {
     gameLoadedProcessed,
     gameLoadedTimer: gameLoadedTimer !== null,
     GAME_LOADED_DEBOUNCE_DELAY
+  });
+};
+
+// 导出用于调试用户登录防抖状态的函数
+export const debugUserLoginState = () => {
+  console.log('React: 当前用户登录防抖状态:', {
+    userLoginTimer: userLoginTimer !== null,
+    lastUserLoginData,
+    USER_LOGIN_DEBOUNCE_DELAY
   });
 };
 
@@ -202,7 +266,7 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>('');
   const [messageLog, setMessageLog] = useState<string[]>([]);
-  const [showIframe, setShowIframe] = useState(false);
+  const [showIframe, setShowIframe] = useState(true); // 默认显示iframe
   const [isMuted, setIsMuted] = useState(false);
 
   // 初始化时从localStorage读取静音状态
@@ -227,18 +291,9 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const sendUserEmail = (email: string, loginType?: number) => {
-    const userEmailMessage = {
-      type: 'USER_LOGIN',
-      action: 'setUserEmail',
-      data: {
-        email: email,
-        timestamp: new Date().toISOString(),
-        source: 'react_parent',
-        loginType: loginType || 1
-      }
-    };
-    sendMessageToGame(userEmailMessage);
-    console.log('React: 发送用户邮箱到游戏 ->', email, '登录类型:', loginType || 1);
+    // 使用防抖机制发送用户登录信息
+    sendUserLoginDebounced(sendMessageToGame, email, loginType || 1);
+    console.log('React: 调用防抖用户登录函数 ->', email, '登录类型:', loginType || 1);
   };
 
   const toggleMute = () => {
@@ -323,7 +378,9 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const isSignedIn = localStorage.getItem('isSignedIn');
           
           if (isSignedIn === 'true' && userInfo.userId && userInfo.userId.includes('@')) {
-            sendUserEmail(userInfo.userId, 1);
+            // 使用防抖机制发送用户登录信息
+            sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
+            console.log('React: localStorage变化触发防抖用户登录');
           }
         } catch (error) {
           console.error('处理用户登录状态变化失败:', error);
@@ -383,12 +440,25 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 // 全局组件，管理唯一的iframe
 export const GlobalIframe: React.FC = () => {
-  const [showIframe, setShowIframe] = useState(false);
-  const [position, setPosition] = useState<'hidden' | 'container'>('hidden');
+  const [showIframe, setShowIframe] = useState(true); // 默认显示
+  const [position, setPosition] = useState<'hidden' | 'container'>('container'); // 默认显示
   const [isMuted, setIsMuted] = useState(false);
   // 固定iframe URL，不再允许更改
   const iframeUrl = 'https://dramai.world/webframe/';
   const cocosContext = useCocos();
+  
+  // 监听cocosContext中的showIframe状态变化
+  useEffect(() => {
+    if (cocosContext && cocosContext.showIframe !== undefined) {
+      setShowIframe(cocosContext.showIframe);
+      // 当showIframe为true时，设置position为container以显示iframe
+      if (cocosContext.showIframe) {
+        setPosition('container');
+      } else {
+        setPosition('hidden');
+      }
+    }
+  }, [cocosContext?.showIframe]);
   
   // 确保iframe在应用启动时就开始加载，设置为eager加载
   useEffect(() => {
@@ -428,7 +498,7 @@ export const GlobalIframe: React.FC = () => {
       
       return () => clearTimeout(retryTimer);
     }
-  }, [iframeUrl]);
+  }, []); // iframeUrl is constant, no need to add as dependency
   
   // 初始化时从localStorage读取静音状态
   useEffect(() => {
@@ -576,7 +646,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>('');
   const [messageLog, setMessageLog] = useState<string[]>([]);
-  const [showIframe, setShowIframe] = useState(false);
+  const [showIframe, setShowIframe] = useState(true); // 默认显示，避免在Scene/BuildDrama页面出现Loading Game提示
   const [isMuted, setIsMuted] = useState(false);
   
   // 容器ref，用于iframe定位
@@ -600,18 +670,9 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
   };
 
   const sendUserEmail = (email: string, loginType?: number) => {
-    const userEmailMessage = {
-      type: 'USER_LOGIN',
-      action: 'setUserEmail',
-      data: {
-        email: email,
-        timestamp: new Date().toISOString(),
-        source: 'react_parent',
-        loginType: loginType || 1 // 默认为1，谷歌为2，苹果为3
-      }
-    };
-    sendMessageToGame(userEmailMessage);
-    console.log('React: 发送用户邮箱到游戏 ->', email, '登录类型:', loginType || 1);
+    // 使用防抖机制发送用户登录信息
+    sendUserLoginDebounced(sendMessageToGame, email, loginType || 1);
+    console.log('React: 调用防抖用户登录函数 ->', email, '登录类型:', loginType || 1);
   };
 
   const toggleMute = () => {
@@ -706,8 +767,9 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
           const isSignedIn = localStorage.getItem('isSignedIn');
           
           if (isSignedIn === 'true' && userInfo.userId && userInfo.userId.includes('@')) {
-            // 用户刚刚登录，发送邮箱到游戏
-            sendUserEmail(userInfo.userId, 1); // 默认登录类型为1
+            // 用户刚刚登录，使用防抖机制发送邮箱到游戏
+            sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
+            console.log('React: localStorage变化触发防抖用户登录');
           }
         } catch (error) {
           console.error('处理用户登录状态变化失败:', error);
@@ -757,10 +819,17 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
     
     // 先立即定位一次，减少黑屏窗口
     positionIframeToContainer();
+    
+    // 立即同步全局状态，避免Loading Game提示
+    if (globalSetShowIframe) {
+      globalSetShowIframe(showIframe);
+    }
+    if (globalSetPosition) {
+      globalSetPosition(showIframe ? 'container' : 'hidden');
+    }
+    
+    // 延迟200ms后再次定位，确保布局稳定
     const timer = setTimeout(() => {
-      setShowIframe(true);
-      globalSetShowIframe?.(true);
-      globalSetPosition?.('container');
       positionIframeToContainer();
     }, 200);
     
@@ -785,7 +854,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
         globalSetPosition('hidden');
       }
     };
-  }, [iframeUrl]);
+  }, []); // 移除showIframe依赖，避免无限循环
 
   // 当容器大小变化时重新定位iframe
   useEffect(() => {

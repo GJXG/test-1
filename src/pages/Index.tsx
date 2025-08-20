@@ -9,6 +9,7 @@ import { MOCK_DRAMAS } from '@/mock/dramas';
 import { toast } from '@/components/ui/use-toast';
 import { MOCK_DRAMA_COVERS, MOCK_CHARACTERS } from '@/mock/scene-data';
 import { websocketService } from '@/services/websocket';
+import { useCocos } from '@/components/CocosEmbed';
 
 interface UserInfo {
   userId: string;
@@ -28,6 +29,9 @@ const Index = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  
+  // 获取iframe控制状态
+  const { showIframe, setShowIframe } = useCocos();
 
   // Check login status on component mount and re-send login request
   useEffect(() => {

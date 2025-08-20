@@ -8,35 +8,35 @@ const LoadingScreen: React.FC = () => {
   const navigate = useNavigate();
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // 监控iframe加载状态，但不干预加载过程
+  // Monitor iframe loading status without interfering with the loading process
   useEffect(() => {
-    console.log('LoadingScreen: 监控iframe加载状态');
+    console.log('LoadingScreen: Monitoring iframe loading status');
     
     const checkIframeStatus = () => {
       if (iframeRef.current) {
-        console.log('LoadingScreen: iframe已挂载，src:', iframeRef.current.src);
+        console.log('LoadingScreen: iframe mounted, src:', iframeRef.current.src);
         const docReadyState = iframeRef.current.contentDocument?.readyState;
         console.log('LoadingScreen: iframe document readyState:', docReadyState);
         return true;
       } else {
-        console.log('LoadingScreen: 等待GlobalIframe挂载...');
+        console.log('LoadingScreen: Waiting for GlobalIframe to mount...');
         return false;
       }
     };
     
-    // 立即检查一次
+    // Check immediately
     if (!checkIframeStatus()) {
-      // 如果iframe还没挂载，每500ms检查一次状态
+      // If iframe is not mounted yet, check status every 500ms
       const statusCheckInterval = setInterval(() => {
         if (checkIframeStatus()) {
           clearInterval(statusCheckInterval);
         }
       }, 500);
       
-      // 10秒后停止检查
+      // Stop checking after 10 seconds
       setTimeout(() => {
         clearInterval(statusCheckInterval);
-        console.log('LoadingScreen: 停止iframe状态检查');
+        console.log('LoadingScreen: Stopped iframe status checking');
       }, 10000);
       
       return () => clearInterval(statusCheckInterval);
@@ -88,26 +88,10 @@ const LoadingScreen: React.FC = () => {
 
     window.addEventListener('message', handleMessage);
     
-    // If no load complete message is received within 5 seconds, continue anyway
-    const timeoutId = setTimeout(() => {
-      if (!loaded) {
-        console.log('Loading timeout, continuing anyway');
-        setProgress(100);
-        setLoaded(true);
-        
-        if (progressInterval.current) {
-          clearInterval(progressInterval.current);
-        }
-        
-        setTimeout(() => {
-          navigate('/home');
-        }, 800);
-      }
-    }, 10000);
+    // Remove automatic timeout redirect, only enter home page after receiving GAME_LOADED event
 
     return () => {
       window.removeEventListener('message', handleMessage);
-      clearTimeout(timeoutId);
     };
   }, [navigate, loaded]);
 
