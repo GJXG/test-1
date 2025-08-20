@@ -116,30 +116,31 @@ const handleGameLoadedDebounced = (
     window.dispatchEvent(iframeLoadedEvent);
     console.log('已触发iframe-loaded事件');
 
-    // 检查是否有已登录的用户信息，如果有则发送邮箱（使用防抖）
-    const storedUserInfo = localStorage.getItem('userInfo');
-    const storedLoginStatus = localStorage.getItem('isSignedIn');
+    // 检查是否有已登录的用户信息，如果有则发送邮箱（使用防抖）- 暂时屏蔽
+    // const storedUserInfo = localStorage.getItem('userInfo');
+    // const storedLoginStatus = localStorage.getItem('isSignedIn');
 
-    if (storedUserInfo && storedLoginStatus === 'true') {
-      try {
-        const userInfo = JSON.parse(storedUserInfo);
-        if (userInfo.userId && userInfo.userId.includes('@')) {
-          sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
-          console.log('React: 已调用防抖用户登录函数');
-        }
-      } catch (error) {
-        console.error('解析用户信息失败:', error);
-      }
-    }
+    // if (storedUserInfo && storedLoginStatus === 'true') {
+    //   try {
+    //     const userInfo = JSON.parse(storedUserInfo);
+    //     if (userInfo.userId && userInfo.userId.includes('@')) {
+    //       sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
+    //       console.log('React: 已调用防抖用户登录函数');
+    //     }
+    //   } catch (error) {
+    //     console.error('解析用户信息失败:', error);
+    //   }
+    // }
+    console.log('React: USER_LOGIN消息已暂时屏蔽');
 
-    // 发送初始场景数据
-    sendMessageToGame({
-      type: 'INIT_SCENE',
-      data: {
-        scenes: []
-      }
-    });
-    console.log('React: 已发送初始场景数据');
+    // 发送初始场景数据 - 暂时屏蔽
+    // sendMessageToGame({
+    //   type: 'INIT_SCENE',
+    //   data: {
+    //     scenes: []
+    //   }
+    // });
+    console.log('React: INIT_SCENE消息已暂时屏蔽');
 
     // 设置gameLoadedProcessed为true，表示基本处理已完成
     // 但场景导航消息会在每次GAME_LOADED事件中单独处理
@@ -370,7 +371,7 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
-    // 监听localStorage变化（用户登录状态变化）
+    // 监听localStorage变化（用户登录状态变化）- 暂时屏蔽
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === 'userInfo' && event.newValue) {
         try {
@@ -378,9 +379,9 @@ export const CocosProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const isSignedIn = localStorage.getItem('isSignedIn');
           
           if (isSignedIn === 'true' && userInfo.userId && userInfo.userId.includes('@')) {
-            // 使用防抖机制发送用户登录信息
-            sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
-            console.log('React: localStorage变化触发防抖用户登录');
+            // 使用防抖机制发送用户登录信息 - 暂时屏蔽
+            // sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
+            console.log('React: localStorage变化触发防抖用户登录 - 已屏蔽');
           }
         } catch (error) {
           console.error('处理用户登录状态变化失败:', error);
@@ -759,7 +760,7 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
       }
     };
 
-    // 监听localStorage变化（用户登录状态变化）
+    // 监听localStorage变化（用户登录状态变化）- 暂时屏蔽
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === 'userInfo' && event.newValue) {
         try {
@@ -767,9 +768,9 @@ const CocosEmbed: React.FC<CocosEmbedProps> = ({ className, children, sceneId, i
           const isSignedIn = localStorage.getItem('isSignedIn');
           
           if (isSignedIn === 'true' && userInfo.userId && userInfo.userId.includes('@')) {
-            // 用户刚刚登录，使用防抖机制发送邮箱到游戏
-            sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
-            console.log('React: localStorage变化触发防抖用户登录');
+            // 用户刚刚登录，使用防抖机制发送邮箱到游戏 - 暂时屏蔽
+            // sendUserLoginDebounced(sendMessageToGame, userInfo.userId, 1);
+            console.log('React: localStorage变化触发防抖用户登录 - 已屏蔽');
           }
         } catch (error) {
           console.error('处理用户登录状态变化失败:', error);
