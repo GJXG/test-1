@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { iframeRef } from './CocosEmbed';
+import { iframeRef, useCocos } from './CocosEmbed';
 
 const LoadingScreen: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const navigate = useNavigate();
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
+  // 获取CocosContext，用于直接使用相关状态和方法
+  const cocosContext = useCocos();
 
   // Monitor iframe loading status without interfering with the loading process
   useEffect(() => {
@@ -76,10 +78,20 @@ const LoadingScreen: React.FC = () => {
             clearInterval(progressInterval.current);
           }
           
-          // Wait a moment before redirecting, to let user see 100%
+          // 确保iframe显示，这会触发CocosEmbed组件中的useEffect
+          if (cocosContext && cocosContext.setShowIframe) {
+            cocosContext.setShowIframe(true);
+          }
+          
+          // 手动触发iframe-loaded事件，确保App组件知道iframe已加载
+          const iframeLoadedEvent = new Event('iframe-loaded');
+          window.dispatchEvent(iframeLoadedEvent);
+          console.log('LoadingScreen: 手动触发iframe-loaded事件');
+          
+          // 延迟导航，确保状态已更新
           setTimeout(() => {
             navigate('/home');
-          }, 800);
+          }, 1500);
         }
       } catch (error) {
         console.error('Error processing message from iframe:', error);

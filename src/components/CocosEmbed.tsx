@@ -31,7 +31,7 @@ let globalSetIframeUrl: ((url: string) => void) | null = null;
 // 防抖机制相关变量
 let gameLoadedProcessed = false;
 let gameLoadedTimer: NodeJS.Timeout | null = null;
-const GAME_LOADED_DEBOUNCE_DELAY = 100; // 100ms 防抖延迟
+const GAME_LOADED_DEBOUNCE_DELAY = 50; // 减少防抖延迟到50ms，加快状态更新
 
 // 用户登录消息防抖机制
 let userLoginTimer: NodeJS.Timeout | null = null;
@@ -109,12 +109,12 @@ const handleGameLoadedDebounced = (
     
     // 设置连接状态 - 不再检查gameLoadedProcessed标志，确保每次都处理
     setIsConnected(true);
-    console.log('React: 游戏iframe已加载');
+    console.log('React: 游戏iframe已加载，isConnected已设置为true');
 
-    // 触发自定义事件，通知App组件iframe已加载完成
+    // 立即触发自定义事件，通知App组件iframe已加载完成
     const iframeLoadedEvent = new Event('iframe-loaded');
     window.dispatchEvent(iframeLoadedEvent);
-    console.log('已触发iframe-loaded事件');
+    console.log('React: 已触发iframe-loaded事件，通知App组件iframe已加载');
 
     // 检查是否有已登录的用户信息，如果有则发送邮箱（使用防抖）- 暂时屏蔽
     // const storedUserInfo = localStorage.getItem('userInfo');

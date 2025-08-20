@@ -82,7 +82,21 @@ const AppRoutes: React.FC = () => {
 
   // 使用isConnected状态来确定是否已完成预加载
   // 当isConnected为true时，表示iframe已加载完成
-  console.log('iframe连接状态:', isConnected ? '已连接' : '未连接');
+  console.log('AppRoutes: iframe连接状态:', isConnected ? '已连接' : '未连接');
+  
+  // 添加路由变化监听，记录导航状态
+  React.useEffect(() => {
+    const handleRouteChange = () => {
+      console.log('AppRoutes: 路由变化，当前路径:', window.location.pathname, '，iframe连接状态:', isConnected ? '已连接' : '未连接');
+    };
+    
+    // 监听popstate事件（浏览器前进/后退按钮）
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, [isConnected]);
 
   return (
     <>
